@@ -83,7 +83,7 @@ class Learner:
 class Replica:
 
     def __init__(self, address, otherReplicas):
-        self.id = 0
+        self.id = 1
         self.proposer = Proposer(self.id, address, len(otherReplicas) + 1, otherReplicas)
         self.acceptor = Acceptor(self.id, address, otherReplicas)
         self.learner = Learner(len(otherReplicas) + 1)
@@ -92,9 +92,8 @@ class Replica:
 
     def receive_request(self, m):
         self.runPaxos(m)
-        return "Okay"
 
-    def runPaxos(self, m):
+    def runPaxos(m):
         self.proposer.setMessage(m)
         self.receiveIAmLeader(self.id, self.address)
         for replica in self.otherReplicas():
@@ -116,7 +115,7 @@ class Replica:
 
     def run(self):
 
-        with SimpleXMLRPCServer(("localhost", 8000),
+        with SimpleXMLRPCServer(("localhost", 8001),
                                 requestHandler=RequestHandler, allow_none=True) as server:
             server.register_introspection_functions()
 
@@ -131,7 +130,7 @@ class Replica:
 
 
 def main():
-    replica = Replica("http://localhost:8000", ["http://localhost:8001", "http://localhost:8002" ])
+    replica = Replica("http://localhost:8000", ["http://localhost:8000", "http://localhost:8002" ])
     replica.run()
 
 main()
