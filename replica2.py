@@ -57,10 +57,8 @@ class Acceptor:
         # NOTE: Use leader ID, not process ID
         self.currentLeader = id
         print(address)
-        s = xmlrpc.client.ServerProxy(address, allow_none=True)
         print("Okay here")
-        address = "http://localhost:8002"
-        s.receiveYouAreLeader(id, address, self.currentAcceptedValue, self.currentLeader)
+        return (self.currentAcceptedValue, self.currentLeader)
 
     def receiveProposedMessage(self, id, address, message):
         # NOTE: We were a little unsure about this rule

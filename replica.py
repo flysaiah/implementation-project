@@ -57,9 +57,8 @@ class Acceptor:
         # NOTE: Use leader ID, not process ID
         self.currentLeader = id
         print(address)
-        s = xmlrpc.client.ServerProxy(address, allow_none=True)
         print("Okay here")
-        s.receiveYouAreLeader(id, address, self.currentAcceptedValue, self.currentLeader)
+        return self.currentAcceptedValue, self.currentLeader
 
     def receiveProposedMessage(self, id, address, message):
         # NOTE: We were a little unsure about this rule
@@ -114,8 +113,9 @@ class Replica:
         print("Self stuff done")
         for replica in self.otherReplicas:
             print("LOOPING")
-            s = xmlrpc.client.ServerProxy(replica)
-            s.receiveIAmLeader(self.id, self.address)
+            s = xmlrpc.client.Server(replica)
+            currentAcceptedValue, currentLeader = s.receiveIAmLeader(self.id, self.address)
+            self.receiveYouAreLeader(self.id, self.address, currentAcceptedValue, currentLeader)
             print("ENDLOOP 1")
 
 
