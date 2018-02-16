@@ -20,16 +20,20 @@ class Proposer:
     def setMessage(self, m):
         self.message = m
 
-    def receiveYouAreLeader(self, address, currentAcceptedValue, currentLeader):
+    def receiveYouAreLeader(self, id, address, currentAcceptedValue, currentLeader):
         self.numberOfAcceptorResponses += 1
+        print("Uh oh 2")
+        print(currentLeader)
+        print(self.mostRecentLeader)
         if currentLeader is not None and currentLeader >= self.mostRecentLeader:
             self.mostRecentLeader = currentLeader
             self.requiredMessageToSend = currentAcceptedValue
+        print("Made it here")
 
         if self.numberOfAcceptorResponses > (self.numberOfAcceptors / 2):
             self.proposeMessage()
 
-    def proposeMessage():
+    def proposeMessage(self):
         if self.requiredMessageToSend is not None:
             # send required message
             for replica in self.otherReplicas():
@@ -37,6 +41,7 @@ class Proposer:
                 s.receiveProposedMessage(self.id, self.address, self.requiredMessageToSend)
         else:
             # send original message
+            self.acceptor.receiveProposedMessage(self.id, self.address, self.message)
             for replica in self.otherReplicas():
                 s = xmlrpc.client.ServerProxy(replica)
                 s.receiveProposedMessage(self.id, self.address, self.message)
@@ -45,15 +50,22 @@ class Acceptor:
         self.currentAcceptedValue = None
         self.currentLeader = None
         self.otherReplicas = otherReplicas
+        self.id = id
+        self.address = address
 
     def receiveIAmLeader(self, id, address):
         # NOTE: Use leader ID, not process ID
         self.currentLeader = id
-        s = xmlrpc.client.ServerProxy(address)
+        print(address)
+        s = xmlrpc.client.ServerProxy(address, allow_none=True)
+        print("Okay here")
+        address = "http://localhost:8002"
         s.receiveYouAreLeader(id, address, self.currentAcceptedValue, self.currentLeader)
 
     def receiveProposedMessage(self, id, address, message):
         # NOTE: We were a little unsure about this rule
+        print("Uh oh")
+        print(id)
         if id >= self.currentLeader:
             self.acceptMessage(message)
         # NOTE: Do we need to update current leader?
@@ -92,20 +104,28 @@ class Replica:
 
     def receive_request(self, m):
         self.runPaxos(m)
+        return "Okay"
 
-    def runPaxos(m):
+    def runPaxos(self, m):
+        print("Running Paxos")
         self.proposer.setMessage(m)
-        self.receiveIAmLeader(self.id, self.address)
-        for replica in self.otherReplicas():
+        #self.receiveIAmLeader(self.id, self.address, True)
+        self.acceptor.currentLeader = self.id
+        self.proposer.receiveYouAreLeader(self.acceptor.id, self.acceptor.address, self.acceptor.currentAcceptedValue, self.acceptor.currentLeader)
+        print("Self stuff done")
+        for replica in self.otherReplicas:
+            print("LOOPING")
             s = xmlrpc.client.ServerProxy(replica)
             s.receiveIAmLeader(self.id, self.address)
+            print("ENDLOOP 1")
 
 
     def receiveIAmLeader(self, id, address):
+        print("OKAY")
         self.acceptor.receiveIAmLeader(id, address)
 
     def receiveYouAreLeader(self, id, address, currentAcceptedValue, currentLeader):
-        self.proposer.receiveYouAreLeader(address, currentAcceptedValue, currentLeader)
+        self.proposer.receiveYouAreLeader(id, address, currentAcceptedValue, currentLeader)
 
     def receiveProposedMessage(self, id, address, message):
         self.acceptor.receiveProposedMessage(id, address, message)
@@ -130,7 +150,7 @@ class Replica:
 
 
 def main():
-    replica = Replica("http://localhost:8000", ["http://localhost:8000", "http://localhost:8002" ])
+    replica = Replica("http://localhost:8001", ["http://localhost:8000", "http://localhost:8002" ])
     replica.run()
 
 main()
