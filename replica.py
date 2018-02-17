@@ -1,104 +1,129 @@
 from xmlrpc.server import SimpleXMLRPCServer
 from xmlrpc.server import SimpleXMLRPCRequestHandler
 import xmlrpc.client
+import time
+import socket
 
 # Restrict to a particular path.
-class RequestHandler(SimpleXMLRPCRequestHandler):
-    rpc_paths = ('/RPC2',)
+# class RequestHandler(SimpleXMLRPCRequestHandler):
+#     rpc_paths = ('/RPC2',)
 
 class Proposer:
-    def __init__(self, id, address, numberOfAcceptors, otherReplicas):
+    def __init__(self, id, port, numberOfAcceptors, otherReplicas, acceptor):
         self.numberOfAcceptors = numberOfAcceptors
         self.numberOfAcceptorResponses = 0
         self.mostRecentLeader = 0
-        self.requiredMessageToSend = None
+        self.requiredMessage = None
         self.message = None
         self.otherReplicas = otherReplicas
         self.id = id
-        self.address = address
+        self.port = port
+        self.acceptor = acceptor
 
     def setMessage(self, m):
         self.message = m
 
-    def receiveYouAreLeader(self, id, address, currentAcceptedValue, currentLeader):
+    def receiveYouAreLeader(self, id, port, currentAcceptedValue, currentLeader):
         self.numberOfAcceptorResponses += 1
-        print("Uh oh 2")
-        print(currentLeader)
-        print(self.mostRecentLeader)
-        if currentLeader is not None and currentLeader >= self.mostRecentLeader:
+        print("Current leader: ", currentLeader)
+        print("Most recent leader: ", self.mostRecentLeader)
+        if currentLeader is not None and currentLeader != "None" and int(currentLeader) >= int(self.mostRecentLeader):
             self.mostRecentLeader = currentLeader
-            self.requiredMessageToSend = currentAcceptedValue
-        print("Made it here")
+            self.requiredMessage = currentAcceptedValue
 
-        if self.numberOfAcceptorResponses > (self.numberOfAcceptors / 2):
+        if self.numberOfAcceptorResponses == (self.numberOfAcceptors // 2 + 1):
             self.proposeMessage()
 
     def proposeMessage(self):
-        if self.requiredMessageToSend is not None:
+        print("Proposing message")
+        print("Message: ", self.message)
+        print("Req: ", self.requiredMessage)
+        if self.requiredMessage is not None and self.requiredMessage != "None":
+            print("This shouldn't be happening")
             # send required message
-            for replica in self.otherReplicas():
-                s = xmlrpc.client.ServerProxy(replica)
-                s.receiveProposedMessage(self.id, self.address, self.requiredMessageToSend)
+            self.acceptor.receiveProposedMessage(self.id, self.port, self.requiredMessage)
+            for replica in self.otherReplicas:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.connect(('localhost', replica))
+                s.sendall((':'.join(['3', str(self.id), str(self.port), self.requiredMessage]).encode('utf-8')))
+                s.close()
         else:
             # send original message
-            self.acceptor.receiveProposedMessage(self.id, self.address, self.message)
-            for replica in self.otherReplicas():
-                s = xmlrpc.client.ServerProxy(replica)
-                s.receiveProposedMessage(self.id, self.address, self.message)
+            self.acceptor.receiveProposedMessage(self.id, self.port, self.message)
+            for replica in self.otherReplicas:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.connect(('localhost', replica))
+                s.sendall((':'.join(['3', str(self.id), str(self.port), self.message]).encode('utf-8')))
+                s.close()
+
+
 class Acceptor:
-    def __init__(self, id, address, otherReplicas):
+    def __init__(self, id, port, otherReplicas):
         self.currentAcceptedValue = None
         self.currentLeader = None
         self.otherReplicas = otherReplicas
         self.id = id
-        self.address = address
+        self.port = port
 
-    def receiveIAmLeader(self, id, address):
+    def receiveIAmLeader(self, id, port):
         # NOTE: Use leader ID, not process ID
-        self.currentLeader = id
-        print(address)
-        print("Okay here")
-        return self.currentAcceptedValue, self.currentLeader
+        if self.currentLeader is None or self.currentLeader == "None" or self.currentLeader <= id:
+            self.currentLeader = id
+            print("Port: ", port)
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect(('localhost', int(port)))
+            s.sendall(':'.join(['2', str(self.id), str(self.port), str(self.currentAcceptedValue) + ';' + str(self.currentLeader)]).encode('utf-8'))
+            s.close()
 
-    def receiveProposedMessage(self, id, address, message):
+
+    def receiveProposedMessage(self, id, port, message):
         # NOTE: We were a little unsure about this rule
-        print("Uh oh")
-        print(id)
+        print("Message: ", message)
         if id >= self.currentLeader:
-            self.acceptMessage(message)
+            self.acceptMessage(id, message)
+
         # NOTE: Do we need to update current leader?
-    def acceptMessage(self, message):
-        # send required message
-        for replica in self.otherReplicas():
-            s = xmlrpc.client.ServerProxy(replica)
-            s.receiveAcceptance(self.id, self.address, message)
+    def acceptMessage(self, id, message):
+        # set the current accepted value
+        self.currentAcceptedValue = message
+        self.currentLeader = id
+        # broadcast accepted value to all learner
+        for replica in self.otherReplicas:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            print("Replica: ", replica)
+            s.connect(('localhost', replica))
+            # should send the id of leader here
+            s.sendall(':'.join(['4', str(self.id), str(self.port), str(self.currentAcceptedValue) + ';' + str(self.currentLeader)]).encode('utf-8'))
+            s.close()
+
 
 class Learner:
     def __init__(self, numberOfAcceptors):
         self.numberOfAcceptors = numberOfAcceptors
         self.acceptanceMap = {}
 
-    def receiveAcceptance(self, id, address, message):
-        if (id, message) not in self.acceptanceMap:
-            self.acceptanceMap[(id, message)] = 1
+    def receiveAcceptance(self, id, port, message, leader):
+        if (leader, message) not in self.acceptanceMap:
+            self.acceptanceMap[(leader, message)] = 1
         else:
-            self.acceptanceMap[(id, messagee)] += 1
+            self.acceptanceMap[(leader, message)] += 1
 
-        if self.acceptanceMap[(id, message)] > self.numberOfAcceptors / 2:
+        if self.acceptanceMap[(leader, message)] > self.numberOfAcceptors / 2:
             self.deliver_message(message)
 
-    def deliver_message(m):
+    def deliver_message(self, m):
         print("Message delivered: ", m)
 
 class Replica:
 
-    def __init__(self, address, otherReplicas):
-        self.id = 0
-        self.proposer = Proposer(self.id, address, len(otherReplicas) + 1, otherReplicas)
-        self.acceptor = Acceptor(self.id, address, otherReplicas)
+    def __init__(self, id, port, otherReplicas):
+        self.id = id
+        self.acceptor = Acceptor(self.id, port, otherReplicas)
+        self.proposer = Proposer(self.id, port, len(otherReplicas) + 1, otherReplicas, self.acceptor)
         self.learner = Learner(len(otherReplicas) + 1)
         self.otherReplicas = otherReplicas
-        self.address = address
+        print("Replicas: ", otherReplicas)
+        self.port = port
 
     def receive_request(self, m):
         self.runPaxos(m)
@@ -107,50 +132,65 @@ class Replica:
     def runPaxos(self, m):
         print("Running Paxos")
         self.proposer.setMessage(m)
-        #self.receiveIAmLeader(self.id, self.address, True)
+        #self.receiveIAmLeader(self.id, self.port, True)
         self.acceptor.currentLeader = self.id
-        self.proposer.receiveYouAreLeader(self.acceptor.id, self.acceptor.address, self.acceptor.currentAcceptedValue, self.acceptor.currentLeader)
-        print("Self stuff done")
+        self.proposer.receiveYouAreLeader(self.acceptor.id, self.acceptor.port, self.acceptor.currentAcceptedValue, self.acceptor.currentLeader)
         for replica in self.otherReplicas:
             print("LOOPING")
-            s = xmlrpc.client.Server(replica)
-            currentAcceptedValue, currentLeader = s.receiveIAmLeader(self.id, self.address)
-            self.receiveYouAreLeader(self.id, self.address, currentAcceptedValue, currentLeader)
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # NOTE: Will have to change this to include other hostnames
+            s.connect(('localhost', replica))
+            # Send I AM LEADER message
+            s.sendall(':'.join(['1', str(self.id), str(self.port), '_']).encode('utf-8'))
+            s.close()
             print("ENDLOOP 1")
 
 
-    def receiveIAmLeader(self, id, address):
-        print("OKAY")
-        self.acceptor.receiveIAmLeader(id, address)
-
-    def receiveYouAreLeader(self, id, address, currentAcceptedValue, currentLeader):
-        print("PPLLLLZZZZ")
-        self.proposer.receiveYouAreLeader(id, address, currentAcceptedValue, currentLeader)
-
-    def receiveProposedMessage(self, id, address, message):
-        self.acceptor.receiveProposedMessage(id, address, message)
-
-    def receiveAcceptance(self, id, address, message):
-        self.learner.receiveAcceptance(id, address, message)
-
     def run(self):
+        TCP_IP = 'localhost'
+        TCP_PORT = self.port
+        BUFFER_SIZE = 1024
 
-        with SimpleXMLRPCServer(("localhost", 8000),
-                                requestHandler=RequestHandler, allow_none=True) as server:
-            server.register_introspection_functions()
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind((TCP_IP, TCP_PORT))
+        s.listen(1)
 
-            server.register_function(self.receive_request, 'receive_request')
-            server.register_function(self.receiveIAmLeader, 'receiveIAmLeader')
-            server.register_function(self.receiveYouAreLeader, 'receiveYouAreLeader')
-            server.register_function(self.receiveProposedMessage, 'receiveProposedMessage')
-            server.register_function(self.receiveAcceptance, 'receiveAcceptance')
+        # reqType of request received:
+        #     0. client message
+        #     1. IamLeader
+        #     2. YouAreLeader
+        #     3. proposedValue
+        #     4. accceptedValue
 
-            # Run the server's main loop
-            server.serve_forever()
+        while 1:
+            conn, addr = s.accept()
+            print ('Connection address:', addr)
+            data = conn.recv(BUFFER_SIZE).decode('utf_8')
+            conn.close()
+            #print("Request received, data = ", data)
+            if not data: break
+            host = addr[0]
+            port = addr[1]
+            print("Data: ", data)
+            reqType, clientID, port, msg = data.split(':')
+            print("Request type: ", reqType)
+            print("Message: ", msg)
+            if reqType == "0":
+                self.runPaxos(msg)
+            elif reqType == "1":
+                self.acceptor.receiveIAmLeader(clientID, port)
+            elif reqType == "2":
+                currentAcceptedValue, currentLeader = msg.split(";")
+                self.proposer.receiveYouAreLeader(clientID, port, currentAcceptedValue, currentLeader)
+            elif reqType == "3":
+                self.acceptor.receiveProposedMessage(clientID, port, msg)
+            elif reqType == "4":
+                currentAcceptedValue, currentLeader = msg.split(";")
+                self.learner.receiveAcceptance(clientID, port, currentAcceptedValue, currentLeader)
 
 
 def main():
-    replica = Replica("http://localhost:8000", ["http://localhost:8001", "http://localhost:8002" ])
+    replica = Replica(0, 8000, [8001, 8002])
     replica.run()
 
 main()
