@@ -158,7 +158,7 @@ class Learner:
             print("Message delivered: ", m)
             self.currentSeqNum += 1
             while self.deliveryArray[self.currentSeqNum] is not None:
-                self.log += (deliveryArray[self.currentSeqNum] + '\n')
+                self.log += (self.deliveryArray[self.currentSeqNum] + '\n')
                 print("Message delivered: ", self.deliveryArray[self.currentSeqNum])
                 self.currentSeqNum += 1
             if self.currentSeqNum > len(self.deliveryArray) / 2:
@@ -203,6 +203,7 @@ class Replica:
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind((TCP_IP, TCP_PORT))
+        s.settimeout(5)
         s.listen(1)
 
         mainSeqNum = -1
@@ -215,12 +216,33 @@ class Replica:
         #     4. accceptedValue
 
         while 1:
-            conn, addr = s.accept()
-            print ('Connection address:', addr)
-            data = conn.recv(BUFFER_SIZE).decode('utf_8')
-            conn.close()
+            try:
+                conn, addr = s.accept()
+                print ('Connection address:', addr)
+                data = conn.recv(BUFFER_SIZE).decode('utf_8')
+                conn.close()
+            except:
+                if self.queue.empty():
+                    continue
+                else:
+                    while not self.queue.empty():
+                        queueMsg = self.queue.get()
+                        try:
+                            port = int(queueMsg[0])
+                            msg = queueMsg[1]
+                            cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                            cs.settimeout(0.5)
+                            cs.connect(('localhost', port))
+                            cs.sendall(msg)
+                            cs.close()
+                        except:
+                            print("Error, moving to next message in queue. Message = ", queueMsg)
+                            self.queue.put(queueMsg)
+                            break
             #print("Request received, data = ", data)
-            if not data: break
+            if not data:
+                print("Didn't receive any data")
+                continue
             host = addr[0]
             port = addr[1]
             print("Data: ", data)
@@ -263,26 +285,38 @@ class Replica:
                     port = int(queueMsg[0])
                     msg = queueMsg[1]
                     cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    cs.settimeout(2.0)
+                    cs.settimeout(0.5)
                     cs.connect(('localhost', port))
                     cs.sendall(msg)
                     cs.close()
-                except socket.timeout:
-                    print("Socket timed out, moving to next message in queue")
-                    self.queue.put(queueMsg)
-                    break
-                except ConnectionResetError:
-                    print("Connection Reset Error, moving to next message in queue")
-                    self.queue.put(queueMsg)
-                    break
-                except BrokenPipeError:
-                    print("Broken pipe error, moving to next message in queue")
+                # except socket.timeout:
+                #     print("Socket timed out, moving to next message in queue. Message = ", queueMsg)
+                #     self.queue.put(queueMsg)
+                #     break
+                # except ConnectionResetError:
+                #     print("Connection Reset Error, moving to next message in queue. Message = ", queueMsg)
+                #     self.queue.put(queueMsg)
+                #     break
+                # except BrokenPipeError:
+                #     print("Broken pipe error, moving to next message in queue. Message = ", queueMsg)
+                #     self.queue.put(queueMsg)
+                #     break
+                # except OSError:
+                #     print("OS error, moving to next message in queue. Message = ", queueMsg)
+                #     self.queue.put(queueMsg)
+                #     break
+                # except TimeoutError:
+                #     print("Timeout error, moving to next message in queue. Message = ", queueMsg)
+                #     self.queue.put(queueMsg)
+                #     break
+                except:
+                    print("Error, moving to next message in queue. Message = ", queueMsg)
                     self.queue.put(queueMsg)
                     break
 
 
 def main():
-    replica = Replica(int(sys.argv[1]), int(sys.argv[2]), [int(sys.argv[3]), int(sys.argv[4])])
+    replica = Replica(int(sys.argv[1]), int(sys.argv[2]), [int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]), int(sys.argv[6])])
     replica.run()
 
 main()
