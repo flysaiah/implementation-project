@@ -263,12 +263,23 @@ class Replica:
                     port = int(queueMsg[0])
                     msg = queueMsg[1]
                     cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    cs.settimeout(2.0)
                     cs.connect(('localhost', port))
                     cs.sendall(msg)
                     cs.close()
-                except TimeoutError:
+                except socket.timeout:
+                    print("Socket timed out, moving to next message in queue")
                     self.queue.put(queueMsg)
                     break
+                except ConnectionResetError:
+                    print("Connection Reset Error, moving to next message in queue")
+                    self.queue.put(queueMsg)
+                    break
+                except BrokenPipeError:
+                    print("Broken pipe error, moving to next message in queue")
+                    self.queue.put(queueMsg)
+                    break
+
 
 def main():
     replica = Replica(int(sys.argv[1]), int(sys.argv[2]), [int(sys.argv[3]), int(sys.argv[4])])
