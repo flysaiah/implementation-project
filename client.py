@@ -13,7 +13,7 @@ import time
 var = sys.argv[1]
 
 TCP_IP = 'localhost'
-TCP_PORT = 8003
+TCP_PORT = 8000
 BUFFER_SIZE = 1024
 
 MESSAGE = "0:-1:23923:randomstring:Hello world!" + var

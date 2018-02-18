@@ -2,6 +2,11 @@ from xmlrpc.server import SimpleXMLRPCServer
 from xmlrpc.server import SimpleXMLRPCRequestHandler
 import xmlrpc.client
 import socket
+import time
+import random
+import sys
+from queue import Queue
+
 
 # Restrict to a particular path.
 # class RequestHandler(SimpleXMLRPCRequestHandler):
@@ -34,7 +39,7 @@ class Proposer:
             self.requiredMessageMap[seqNum] = currentAcceptedValue
 
         if self.numberOfAcceptorResponsesMap[seqNum] == (self.numberOfAcceptors // 2 + 1):
-            self.proposeMessage(seqNum)
+            return self.proposeMessage(seqNum)
 
     def proposeMessage(self, seqNum):
         print("Proposing message for seqNum " + str(seqNum))
@@ -47,22 +52,18 @@ class Proposer:
         if requiredMessage is not None and requiredMessage != "None":
             print("This shouldn't be happening")
             # send required message
-            self.acceptor.receiveProposedMessage(self.id, self.port, str(seqNum), requiredMessage)
+            resArr = self.acceptor.receiveProposedMessage(self.id, self.port, str(seqNum), requiredMessage)
             for replica in self.otherReplicas:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.connect(('localhost', replica))
-                s.sendall((':'.join(['3', str(self.id), str(self.port), str(seqNum), requiredMessage]).encode('utf-8')))
-                s.close()
+                resArr.append((replica, (':'.join(['3', str(self.id), str(self.port), str(seqNum), requiredMessage]).encode('utf-8'))))
+            return resArr
         else:
             # send original message
-            self.acceptor.receiveProposedMessage(self.id, self.port, str(seqNum), self.messageMap[seqNum])
+            resArr = self.acceptor.receiveProposedMessage(self.id, self.port, str(seqNum), self.messageMap[seqNum])
+            if resArr is None:
+                resArr = []
             for replica in self.otherReplicas:
-                print("About to propose message for seqNum: " + str(seqNum) + " to replica w/port " + str(replica))
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.connect(('localhost', replica))
-                s.sendall((':'.join(['3', str(self.id), str(self.port), str(seqNum), self.messageMap[seqNum]]).encode('utf-8')))
-                s.close()
-                print("Proposed")
+                resArr.append((replica, (':'.join(['3', str(self.id), str(self.port), str(seqNum), self.messageMap[seqNum]]).encode('utf-8'))))
+            return resArr
 
 class Acceptor:
     def __init__(self, id, port, learner, otherReplicas):
@@ -84,10 +85,7 @@ class Acceptor:
             currentAcceptedValue = None
             if seqNum in self.currentAcceptedValueMap:
                 currentAcceptedValue = self.currentAcceptedValueMap[seqNum]
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect(('localhost', int(port)))
-            s.sendall(':'.join(['2', str(self.id), str(self.port), str(seqNum), str(currentAcceptedValue) + ';' + str(self.currentLeaderMap[seqNum])]).encode('utf-8'))
-            s.close()
+            return [(port, (':'.join(['2', str(self.id), str(self.port), str(seqNum), str(currentAcceptedValue) + ';' + str(self.currentLeaderMap[seqNum])]).encode('utf-8')))]
 
     def receiveProposedMessage(self, id, port, seqNum, message):
         print("Received proposed message for seqNum " + str(seqNum))
@@ -98,7 +96,7 @@ class Acceptor:
         if seqNum in self.currentLeaderMap:
             currentLeader = self.currentLeaderMap[seqNum]
         if currentLeader is None or id >= currentLeader:
-            self.acceptMessage(id, seqNum, message)
+            return self.acceptMessage(id, seqNum, message)
 
         # NOTE: Do we need to update current leader?
     def acceptMessage(self, id, seqNum, message):
@@ -109,13 +107,10 @@ class Acceptor:
         self.currentLeaderMap[seqNum] = id
         # broadcast accepted value to all learner
         self.learner.receiveAcceptance(self.id, self.port, seqNum, message, self.currentLeaderMap[seqNum])
+        resArr = []
         for replica in self.otherReplicas:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            # print("Replica: ", replica)
-            s.connect(('localhost', replica))
-            # should send the id of leader here
-            s.sendall(':'.join(['4', str(self.id), str(self.port), str(seqNum), str(self.currentAcceptedValueMap[seqNum]) + ';' + str(self.currentLeaderMap[seqNum])]).encode('utf-8'))
-            s.close()
+            resArr.append((replica, (':'.join(['4', str(self.id), str(self.port), str(seqNum), str(self.currentAcceptedValueMap[seqNum]) + ';' + str(self.currentLeaderMap[seqNum])]).encode('utf-8'))))
+        return resArr
 
 class Learner:
     def __init__(self, numberOfAcceptors):
@@ -182,6 +177,7 @@ class Replica:
         self.otherReplicas = otherReplicas
         print("Replicas: ", otherReplicas)
         self.port = port
+        self.queue = Queue()
 
     def runPaxos(self, m, seqNum):
         print("Running Paxos")
@@ -191,17 +187,13 @@ class Replica:
         currentAcceptedValue = None
         if seqNum in self.acceptor.currentAcceptedValueMap:
             currentAcceptedValue = self.acceptor.currentAcceptedValueMap[seqNum]
-        self.proposer.receiveYouAreLeader(self.acceptor.id, self.acceptor.port, str(seqNum), currentAcceptedValue, self.acceptor.currentLeaderMap[seqNum])
+        resArr = self.proposer.receiveYouAreLeader(self.acceptor.id, self.acceptor.port, str(seqNum), currentAcceptedValue, self.acceptor.currentLeaderMap[seqNum])
+        if resArr is None:
+            resArr = []
         for replica in self.otherReplicas:
+            resArr.append((replica, (':'.join(['1', str(self.id), str(self.port), str(seqNum), '_']).encode('utf-8'))))
             #print("LOOPING")
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            # NOTE: Will have to change this to include other hostnames
-            s.connect(('localhost', replica))
-            # Send I AM LEADER message
-            s.sendall(':'.join(['1', str(self.id), str(self.port), str(seqNum), '_']).encode('utf-8'))
-            s.close()
-            #print("ENDLOOP 1")
-
+        return resArr
 
     def run(self):
 
@@ -237,21 +229,49 @@ class Replica:
             print("Message: ", msg)
             if reqType == "0":
                 mainSeqNum += 1
-                self.runPaxos(msg, str(mainSeqNum))
+                resArray = self.runPaxos(msg, str(mainSeqNum))
+                if resArray is not None:
+                    for res in resArray:
+                        self.queue.put(res)
             elif reqType == "1":
-                self.acceptor.receiveIAmLeader(clientID, port, str(seqNum))
+                resArray = self.acceptor.receiveIAmLeader(clientID, port, str(seqNum))
+                if resArray is not None:
+                    for res in resArray:
+                        self.queue.put(res)
             elif reqType == "2":
                 currentAcceptedValue, currentLeader = msg.split(";")
-                self.proposer.receiveYouAreLeader(clientID, port, str(seqNum), currentAcceptedValue, currentLeader)
+                resArray = self.proposer.receiveYouAreLeader(clientID, port, str(seqNum), currentAcceptedValue, currentLeader)
+                if resArray is not None:
+                    for res in resArray:
+                        self.queue.put(res)
             elif reqType == "3":
-                self.acceptor.receiveProposedMessage(clientID, port, str(seqNum), msg)
+                resArray = self.acceptor.receiveProposedMessage(clientID, port, str(seqNum), msg)
+                if resArray is not None:
+                    for res in resArray:
+                        self.queue.put(res)
             elif reqType == "4":
                 currentAcceptedValue, currentLeader = msg.split(";")
-                self.learner.receiveAcceptance(clientID, port, str(seqNum), currentAcceptedValue, currentLeader)
+                resArray = self.learner.receiveAcceptance(clientID, port, str(seqNum), currentAcceptedValue, currentLeader)
+                if resArray is not None:
+                    for res in resArray:
+                        self.queue.put(res)
 
+            # Dequeue and send messages
+            while not self.queue.empty():
+                queueMsg = self.queue.get()
+                try:
+                    port = int(queueMsg[0])
+                    msg = queueMsg[1]
+                    cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    cs.connect(('localhost', port))
+                    cs.sendall(msg)
+                    cs.close()
+                except TimeoutError:
+                    self.queue.put(queueMsg)
+                    break
 
 def main():
-    replica = Replica(0, 8003, [8001, 8002])
+    replica = Replica(int(sys.argv[1]), int(sys.argv[2]), [int(sys.argv[3]), int(sys.argv[4])])
     replica.run()
 
 main()
