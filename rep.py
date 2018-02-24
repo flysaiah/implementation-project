@@ -282,6 +282,8 @@ class Replica:
                             cs.connect(('localhost', port))
                             cs.sendall(msg)
                             cs.close()
+                        except KeyboardInterrupt:
+                            raise
                         except:
                             print("Error, moving to next message in queue. Message = ", queueMsg)
                             self.queue.put(queueMsg)
@@ -422,6 +424,8 @@ class Replica:
                 #     print("Timeout error, moving to next message in queue. Message = ", queueMsg)
                 #     self.queue.put(queueMsg)
                 #     break
+                except KeyboardInterrupt:
+                    raise
                 except:
                     print("Error, moving to next message in queue. Message = ", queueMsg)
                     self.queue.put(queueMsg)
