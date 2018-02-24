@@ -58,7 +58,7 @@ while 1:
         TCP_PORT = 8000
         BUFFER_SIZE = 4096
 
-        MESSAGE = ":".join(["0", str(myID), "-1",  str(sys.argv[2]), "-1", str(mySeqNum), "-1", "Hello world!" + str(myID) + "--" + str(mySeqNum)])
+        MESSAGE = ":".join(["6", str(myID), "-1",  str(sys.argv[2]), "-1", str(mySeqNum), "-1", "Hello world!" + str(myID) + "--" + str(mySeqNum)])
         c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         c.connect((TCP_IP, TCP_PORT))
         c.sendall(MESSAGE.encode('utf-8'))
