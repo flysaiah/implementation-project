@@ -266,6 +266,8 @@ class Replica:
                 print ('Connection address:', addr)
                 data = conn.recv(BUFFER_SIZE).decode('utf_8')
                 conn.close()
+            except KeyboardInterrupt:
+                raise
             except:
                 if self.queue.empty():
                     #print("Timeout, queue is empty")
@@ -334,7 +336,7 @@ class Replica:
                     # if resArray is not None:
                     #     for res in resArray:
                     #         self.queue.put(res)
-                
+
                 elif reqType == "6":
                     # I'm the new primary, run election
                     resArray = []
@@ -351,7 +353,7 @@ class Replica:
                     resArray.append(self.syncSeqNumMap(self.learner.currentSeqNum, self.mainSeqNum, clientID, clientPort, clientSeqNum, m))
                     # Sync the mainSeqNum of all replicas
                     resArray.append(self.syncMainSeqNum(clientID, clientPort, clientSeqNum, m))
-               
+
                 elif reqType == "7":
                     # requestSyncMainSeqNum
                     resArray = self.respMainSeqNum(replicaID, msg, clientID, clientPort, clientSeqNum)
@@ -387,7 +389,7 @@ class Replica:
 
 
 
-            
+
             if resArray is not None:
                 for res in resArray:
                     self.queue.put(res)
