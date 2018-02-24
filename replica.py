@@ -50,9 +50,8 @@ class Proposer:
             requiredMessage = self.requiredMessageMap[seqNum]
         print("Req: ", requiredMessage)
         if requiredMessage is not None and requiredMessage != "None":
-            print("This shouldn't be happening")
             # send required message
-            resArr = self.acceptor.receiveProposedMessage(self.id, self.port, str(seqNum), requiredMessage)
+            resArr = self.acceptor.receiveProposedMessage(self.id, self.port, str(seqNum), requiredMessage, clientID, clientPort, clientSeqNum)
             for replica in self.otherReplicas:
                 resArr.append((replica, (':'.join(['3', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), requiredMessage]).encode('utf-8'))))
             return resArr
@@ -78,7 +77,7 @@ class Acceptor:
         print("Received I AM LEADER for seqNum " + str(seqNum))
         # NOTE: Use leader ID, not process ID
         seqNum = int(seqNum)
-        if seqNum not in self.currentLeaderMap or self.currentLeaderMap[seqNum] <= id:
+        if seqNum not in self.currentLeaderMap or int(self.currentLeaderMap[seqNum]) <= int(id):
         # if self.currentLeader is None or self.currentLeader == "None" or self.currentLeader <= id:
             self.currentLeaderMap[seqNum] = id
             print("Port: ", port)
@@ -95,7 +94,7 @@ class Acceptor:
         currentLeader = None
         if seqNum in self.currentLeaderMap:
             currentLeader = self.currentLeaderMap[seqNum]
-        if currentLeader is None or id >= currentLeader:
+        if currentLeader is None or int(id) >= int(currentLeader):
             return self.acceptMessage(id, seqNum, message, clientID, clientPort, clientSeqNum)
 
         # NOTE: Do we need to update current leader?
