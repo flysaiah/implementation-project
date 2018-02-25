@@ -240,7 +240,11 @@ class Replica:
 
         if(seqNum in self.acceptor.seqToInfo):
             msg = self.acceptor.seqToInfo[seqNum] + ';' + m
-        msg = ':'.join(['10', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), str(res)]).encode('utf-8')
+        tmp = []
+        for key in list(res.keys()):
+            tmp.append(str(key) + "_" + str(res[key]))
+        resString = "|".join(tmp)
+        msg = ':'.join(['10', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), resString]).encode('utf-8')
         return [(port, msg)]
 
 
@@ -402,8 +406,11 @@ class Replica:
                 elif reqType == "10":
                     self.syncCount += 1
                     # respSyncSeqNumMap
-                    if msg != '{}':
-                        tmp = msg.split("{")[1].split("}")
+                    if msg != '':
+                        res = {}
+                        tmp = msg.split("|")
+                        for pair in tmp:
+                            res[tmp.split("_")[0]] = res[tmp.split("_")[1]]
                         # if this is the first time we see this (cid, cseq) pair
                         if info not in self.acceptor.infoToSeq:
                             info, m = msg.split(';')
