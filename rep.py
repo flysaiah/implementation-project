@@ -292,7 +292,7 @@ class Replica:
                         cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         try:
                             port = int(queueMsg[0])
-                            if port < self.curView + 8000:
+                            if port < self.curView + 8000 or port == -1:
                                 print("outdated view: ", port)
                                 continue
                             msg = queueMsg[1]
@@ -316,6 +316,7 @@ class Replica:
             print("Data: ", data)
             reqType, clientID, replicaID, clientPort, replicaPort, clientSeqNum, seqNum, msg = data.split(':')
             seqNum = int(seqNum)
+            self.mainSeqNum = max(self.mainSeqNum, seqNum)
             # self.mainSeqNum = max(self.mainSeqNum, seqNum)
             print("Request type: ", reqType)
             print("Message: ", msg)
@@ -345,7 +346,6 @@ class Replica:
                     #     for res in resArray:
                     #         self.queue.put(res)
                 elif reqType == "3":
-                    self.mainSeqNum = max(self.mainSeqNum, seqNum)
                     resArray = self.acceptor.receiveProposedMessage(replicaID, replicaPort, str(seqNum), msg, clientID, clientPort, clientSeqNum)
                     # if resArray is not None:
                     #     for res in resArray:
@@ -433,6 +433,12 @@ class Replica:
                                     resArray = resArray + self.runPaxos(msg, str(seqNum), clientID, clientPort, clientSeqNum)
                                     del self.recType6Map[info]
                     if(self.syncCount == len(self.otherReplicas) // 2):
+                        # detect the holes and propose None for the holes
+                        for i in range(self.learner.currentSeqNum, self.mainSeqNum + 1):
+                            if i not in self.acceptor.seqToInfo:
+                                print("detect hole for seq num ", i)
+                                resArray + self.runPaxos('___None___', str(i), -1, -1, -1)
+                        # clear the map
                         for info in list(self.recType6Map.keys()):
                             self.mainSeqNum += 1
                             clientID, clientSeqNum = info.split(" ")
@@ -440,6 +446,8 @@ class Replica:
                             print("main seq before running paxos:", self.mainSeqNum)
                             resArray = resArray + self.runPaxos(msg, str(self.mainSeqNum), clientID, clientPort, clientSeqNum)
                         self.recType6Map = {}
+                        
+
 
 
             if resArray is not None:
@@ -452,7 +460,7 @@ class Replica:
                 cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 try:
                     port = int(queueMsg[0])
-                    if port < self.curView + 8000:
+                    if port < self.curView + 8000 or port == -1:
                         print("outdated view: ", port)
                         continue
                     msg = queueMsg[1]
