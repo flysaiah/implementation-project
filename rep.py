@@ -312,7 +312,7 @@ class Replica:
             print("Data: ", data)
             reqType, clientID, replicaID, clientPort, replicaPort, clientSeqNum, seqNum, msg = data.split(':')
             seqNum = int(seqNum)
-            self.mainSeqNum = max(self.mainSeqNum, seqNum)
+            # self.mainSeqNum = max(self.mainSeqNum, seqNum)
             print("Request type: ", reqType)
             print("Message: ", msg)
             # Don't process request is this client sequence number request has already been taken care of
@@ -341,6 +341,7 @@ class Replica:
                     #     for res in resArray:
                     #         self.queue.put(res)
                 elif reqType == "3":
+                    self.mainSeqNum = max(self.mainSeqNum, seqNum)
                     resArray = self.acceptor.receiveProposedMessage(replicaID, replicaPort, str(seqNum), msg, clientID, clientPort, clientSeqNum)
                     # if resArray is not None:
                     #     for res in resArray:
