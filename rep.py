@@ -304,6 +304,7 @@ class Replica:
                             self.queue.put(queueMsg)
                             cs.close()
                             break
+                    continue
             #print("Request received, data = ", data)
             if not data:
                 print("Didn't receive any data")
@@ -371,6 +372,7 @@ class Replica:
                             resArray.append((clientPort, ':'.join(['5', str(clientSeqNum), "Delivered"]).encode('utf-8')))
                         # this message has not been delivered, run Paxos
                         else:
+                            print("WOO RUNNING PAXOS")
                             resArray = resArray + self.runPaxos(msg, str(seqNum), clientID, clientPort, clientSeqNum)
                     else:
                         self.recType6Map[(clientID + " " + clientSeqNum)] = (msg + "|||" + clientPort)
