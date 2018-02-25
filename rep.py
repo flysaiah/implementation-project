@@ -96,6 +96,7 @@ class Acceptor:
     def receiveProposedMessage(self, id, port, seqNum, message, clientID, clientPort, clientSeqNum):
         print("Received proposed message for seqNum " + str(seqNum))
         # NOTE: We were a little unsure about this rule
+        info = clientID + ' ' + clientSeqNum
         seqNum = int(seqNum)
         print("Message: ", message)
         currentLeader = None
@@ -217,7 +218,7 @@ class Replica:
 
     def syncSeqNumMap(self, start, end, clientID, clientPort, clientSeqNum, m):
         resArr = []
-        for i in range(start, end + 1):
+        for i in range(int(start), int(end) + 1):
             if i not in self.acceptor.seqToInfo:
                 for replica in self.otherReplicas:
                     resArr.append((replica, (':'.join(['9', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(-1), str(i) + ";" + m]).encode('utf-8'))))
@@ -344,8 +345,10 @@ class Replica:
                     # if the (client, clientSeqNum) combination has been seen before
                     if((str(clientID) + " " + str(clientSeqNum)) in self.acceptor.infoToSeq):
                         seqNum = self.acceptor.infoToSeq[str(clientID) + " " + str(clientSeqNum)]
+                        print("SEQNUM = " + str(seqNum))
+                        print("CURRENTSEQNUM = ", self.learner.currentSeqNum)
                         # this message has been delivered, append response to be sent to client
-                        if self.learner.currentSeqNum >= seqNum:
+                        if self.learner.currentSeqNum > seqNum:
                             resArray.append((clientPort, ':'.join(['5', str(clientSeqNum), "Delivered"]).encode('utf-8')))
                         # this message has not been delivered, run Paxos
                         else:
