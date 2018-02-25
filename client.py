@@ -31,7 +31,7 @@ BUFFER_SIZE = 4096
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.bind((TCP_IP, TCP_PORT))
-s.settimeout(20)
+s.settimeout(10)
 s.listen(1)
 
 mySeqNum = 0

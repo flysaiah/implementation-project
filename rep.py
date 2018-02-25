@@ -292,9 +292,14 @@ class Replica:
                         cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         try:
                             port = int(queueMsg[0])
-                            if port < self.curView + 8000 or port == -1:
+                            if port < self.curView + 8000:
                                 print("outdated view: ", port)
                                 continue
+
+                            if port == -1:
+                                print("hole, sending to -1")
+                                continue
+
                             msg = queueMsg[1]
                             #cs.setblocking(0)
                             cs.connect(('localhost', port))
@@ -460,9 +465,13 @@ class Replica:
                 cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 try:
                     port = int(queueMsg[0])
-                    if port < self.curView + 8000 or port == -1:
+                    if port < self.curView + 8000:
                         print("outdated view: ", port)
                         continue
+                    if port == -1:
+                        print("hole, sending to -1")
+                        continue
+                                
                     msg = queueMsg[1]
                     #cs.setblocking(0)
                     cs.settimeout(0.5)
