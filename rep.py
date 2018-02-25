@@ -169,7 +169,7 @@ class Learner:
                 self.log += (self.deliveryArray[self.currentSeqNum] + '\n')
                 print("Message delivered: ", self.deliveryArray[self.currentSeqNum])
                 self.currentSeqNum += 1
-            if self.currentSeqNum > len(self.deliveryArray) / 2:
+            if seqNum > len(self.deliveryArray) / 2 or self.currentSeqNum > len(self.deliveryArray) / 2:
                 self.deliveryArray += [None]*100
         print("------------LOG------------")
         print(self.log)
@@ -310,7 +310,7 @@ class Replica:
 
             resArray = None
             if clientID not in self.clientMap or int(clientSeqNum) >= int(self.clientMap[clientID]):
-                if reqType == "0":
+                if reqType == "0" and (clientID not in self.clientMap or int(clientSeqNum) > int(self.clientMap[clientID])):
                     self.mainSeqNum += 1
                     # First check if client has already sent this message
                     resArray = self.runPaxos(msg, str(self.mainSeqNum), clientID, clientPort, clientSeqNum)

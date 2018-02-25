@@ -31,7 +31,7 @@ BUFFER_SIZE = 4096
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.bind((TCP_IP, TCP_PORT))
-s.settimeout(10)
+s.settimeout(20)
 s.listen(1)
 
 mySeqNum = 0
@@ -68,7 +68,9 @@ while 1:
             c.sendall(MESSAGE.encode('utf-8'))
             rep = c.recv(BUFFER_SIZE)
             c.close()
-    except:
+    except KeyboardInterrupt:
+        raise
+    except socket.timeout:
     # except socket.timeout:
         print("Detecting leader failure, changing view")
         currentLeader += 1
@@ -82,4 +84,6 @@ while 1:
         c.sendall(MESSAGE.encode('utf-8'))
         rep = c.recv(BUFFER_SIZE)
         c.close()
+        continue
+    except:
         continue
