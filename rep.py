@@ -196,7 +196,7 @@ class Replica:
         self.curView = 0
         self.recType6 = False
         self.syncCount = 0
-        self.recType6Queue = Queue()
+        self.recType6Map = {}
 
     def runPaxos(self, m, seqNum, clientID, clientPort, clientSeqNum):
         print("Running Paxos")
@@ -220,7 +220,7 @@ class Replica:
     #         resArr.append((replica, (':'.join(['7', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(-1), m]).encode('utf-8'))))
     #     return resArr;
 
-    def syncSeqNumMap(self, start, seq, clientID, clientPort, clientSeqNum, msg):
+    def syncSeqNumMap(self, start, seq, clientID, clientPort, clientSeqNum):
         # request to sync seqNumMap
         resArr = []
         for replica in self.otherReplicas:
@@ -231,15 +231,16 @@ class Replica:
     #     msg = ':'.join(['8', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(-1), str(self.mainSeqNum) + ";" + m]).encode('utf-8')
     #     return [(port, msg)]
 
-    def respSeqNumMap(self, id, port, seqNum, clientID, clientPort, clientSeqNum, m):
+    def respSeqNumMap(self, id, port, seqNum, clientID, clientPort, clientSeqNum):
         # respond corresponding (cid, cseq) of seqNum
         res = {}
+        seqNum = int(seqNum)
         for i in range(seqNum, self.mainSeqNum):
             if i in self.seqToInfo:
                 res[i] = self.seqToInfo[i]
 
-        if(seqNum in self.acceptor.seqToInfo):
-            msg = self.acceptor.seqToInfo[seqNum] + ';' + m
+        # if(seqNum in self.acceptor.seqToInfo):
+        #     msg = self.acceptor.seqToInfo[seqNum]
         tmp = []
         for key in list(res.keys()):
             tmp.append(str(key) + "_" + str(res[key]))
@@ -310,7 +311,8 @@ class Replica:
             host = addr[0]
             print("Data: ", data)
             reqType, clientID, replicaID, clientPort, replicaPort, clientSeqNum, seqNum, msg = data.split(':')
-            self.mainSeqNum = max(self.mainSeqNum, int(seqNum))
+            seqNum = int(seqNum)
+            self.mainSeqNum = max(self.mainSeqNum, seqNum)
             print("Request type: ", reqType)
             print("Message: ", msg)
             # Don't process request is this client sequence number request has already been taken care of
@@ -356,7 +358,7 @@ class Replica:
                     self.curView = self.id
                     if self.recType6 == False:
                         self.recType6 = True
-                        resArray = self.syncSeqNumMap(self.learner.currentSeqNum, self.mainSeqNum, clientID, clientPort, clientSeqNum, msg)
+                        resArray = self.syncSeqNumMap(self.learner.currentSeqNum, self.mainSeqNum, clientID, clientPort, clientSeqNum)
 
                     print("changing view: ", self.curView)
                     # if the (client, clientSeqNum) combination has been seen before
@@ -371,7 +373,8 @@ class Replica:
                         else:
                             resArray = resArray + self.runPaxos(msg, str(seqNum), clientID, clientPort, clientSeqNum)
                     else:
-                        self.recType6Queue.put((clientID, clientSeqNum, msg))
+                        self.recType6Map[(clientID + " " + clientSeqNum)] = (msg + "|||" + clientPort)
+                        # self.recType6Map.put((clientID, clientSeqNum, msg))
 
 
 
@@ -400,10 +403,11 @@ class Replica:
                     if(int(replicaID) > self.curView):
                         self.curView = int(replicaID)
                         print("changing view: ", self.curView)
-                    seqNum, m = msg.split(';')
-                    resArray = self.respSeqNumMap(replicaID, port, seqNum, clientID, clientPort, clientSeqNum, m)
+                    seqNum = msg
+                    resArray = self.respSeqNumMap(replicaID, replicaPort, seqNum, clientID, clientPort, clientSeqNum)
 
                 elif reqType == "10":
+                    resArray = []
                     self.syncCount += 1
                     # respSyncSeqNumMap
                     if msg != '':
@@ -411,20 +415,25 @@ class Replica:
                         tmp = msg.split("|")
                         for pair in tmp:
                             res[tmp.split("_")[0]] = res[tmp.split("_")[1]]
-                        # if this is the first time we see this (cid, cseq) pair
-                        if info not in self.acceptor.infoToSeq:
-                            info, m = msg.split(';')
-                            cid, cseq = info.split(' ')
-                            # if this is the pair we're looking for
-                            if int(cid) == clientID and int(cseq) == clientSeqNum:
+                        for seqNum in list(res.keys()):
+                            info = res[seqNum]
+                            if info not in self.acceptor.infoToSeq:
                                 self.acceptor.infoToSeq[info] = seqNum
                                 self.acceptor.seqToInfo[seqNum] = seqNum
-                                self.runPaxos(m, str(seqNum), clientID, clientPort, clientSeqNum)
-                            else:
-                                self.acceptor.infoToSeq[info] = seqNum
-                                self.acceptor.seqToInfo[seqNum] = seqNum
-
-
+                                self.mainSeqNum = max(self.mainSeqNum, seqNum)
+                                if info in self.recType6Map:
+                                    clientID, clientSeqNum = info.split(" ")
+                                    msg, clientPort = self.recType6Map[info].split("|||")
+                                    resArray = resArray + self.runPaxos(msg, str(seqNum), clientID, clientPort, clientSeqNum)
+                                    del self.recType6Map[info]
+                    if(self.syncCount == len(self.otherReplicas) // 2):
+                        for info in list(self.recType6Map.keys()):
+                            self.mainSeqNum += 1
+                            clientID, clientSeqNum = info.split(" ")
+                            msg, clientPort = self.recType6Map[info].split("|||")
+                            print("main seq before running paxos:", self.mainSeqNum)
+                            resArray = resArray + self.runPaxos(msg, str(self.mainSeqNum), clientID, clientPort, clientSeqNum)
+                        self.recType6Map = {}
 
 
             if resArray is not None:
