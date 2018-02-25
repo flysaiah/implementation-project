@@ -68,8 +68,8 @@ while 1:
             c.sendall(MESSAGE.encode('utf-8'))
             rep = c.recv(BUFFER_SIZE)
             c.close()
-
-    except socket.timeout:
+    except:
+    # except socket.timeout:
         print("Detecting leader failure, changing view")
         currentLeader += 1
         TCP_IP = 'localhost'

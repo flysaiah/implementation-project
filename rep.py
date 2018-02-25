@@ -193,6 +193,7 @@ class Replica:
         self.port = port
         self.queue = Queue()
         self.mainSeqNum = -1
+        self.curView = 0
 
     def runPaxos(self, m, seqNum, clientID, clientPort, clientSeqNum):
         print("Running Paxos")
@@ -230,7 +231,7 @@ class Replica:
 
     def respSeqNumMap(self, id, port, seqNum, clientID, clientPort, clientSeqNum, m):
         # respond corresponding (cid, cseq) of seqNum
-        msg = None
+        msg = 'None'
         if(seqNum in self.acceptor.seqToInfo):
             msg = self.acceptor.seqToInfo[seqNum] + ';' + m
         msg = ':'.join(['10', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), msg]).encode('utf-8')
@@ -342,6 +343,8 @@ class Replica:
                 elif reqType == "6":
                     # I'm the new primary, run election
                     resArray = []
+                    self.curView = self.id
+                    print("changing view: ", self.curView)
                     # if the (client, clientSeqNum) combination has been seen before
                     if((str(clientID) + " " + str(clientSeqNum)) in self.acceptor.infoToSeq):
                         seqNum = self.acceptor.infoToSeq[str(clientID) + " " + str(clientSeqNum)]
@@ -360,6 +363,9 @@ class Replica:
 
                 elif reqType == "7":
                     # requestSyncMainSeqNum
+                    if(int(replicaID) > self.curView):
+                        self.curView = int(replicaID)
+                        print("changing view: ", self.curView)
                     resArray = self.respMainSeqNum(replicaID, replicaPort, clientID, clientPort, clientSeqNum, msg)
 
                 elif reqType == "8":
@@ -368,10 +374,13 @@ class Replica:
                     mainSeq, m = msg.split(';')
                     if int(mainSeq) > self.mainSeqNum:
                         resArray = self.syncSeqNumMap(self.mainSeqNum + 1, mainSeq, clientID, clientPort, clientSeqNum, m)
-                        self.mainSeqNum = mainSeq
+                        self.mainSeqNum = int(mainSeq)
 
                 elif reqType == "9":
                     # requestSyncSeqNumMap
+                    if(int(replicaID) > self.curView):
+                        self.curView = int(replicaID)
+                        print("changing view: ", self.curView)
                     seqNum, m = msg.split(';')
                     resArray = self.respSeqNumMap(replicaID, port, seqNum, clientID, clientPort, clientSeqNum, m)
 
@@ -404,6 +413,9 @@ class Replica:
                 cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 try:
                     port = int(queueMsg[0])
+                    if port < self.curView + 8000:
+                        print("outdated view: ", port)
+                        continue
                     msg = queueMsg[1]
                     cs.setblocking(0)
                     cs.settimeout(0.5)
