@@ -81,10 +81,10 @@ class Acceptor:
         print("Received I AM LEADER for seqNum " + str(seqNum))
         # NOTE: Use leader ID, not process ID
         seqNum = int(seqNum)
-        if seqNum not in self.currentLeaderMap or self.currentLeaderMap[seqNum] <= id:
+        if seqNum not in self.currentLeaderMap or self.currentLeaderMap[seqNum] <= int(id):
         # if self.currentLeader is None or self.currentLeader == "None" or self.currentLeader <= id:
             info = clientID + ' ' + clientSeqNum
-            self.currentLeaderMap[seqNum] = id
+            self.currentLeaderMap[seqNum] = int(id)
             self.seqToInfo[seqNum] = info
             self.infoToSeq[info] = seqNum
             print("Port: ", port)
@@ -104,7 +104,7 @@ class Acceptor:
         else:
             self.seqToInfo[seqNum] = info
             self.infoToSeq[info] = seqNum
-        if currentLeader is None or id >= currentLeader:
+        if currentLeader is None or int(id) >= currentLeader:
             return self.acceptMessage(id, seqNum, message, clientID, clientPort, clientSeqNum)
 
         # NOTE: Do we need to update current leader?
@@ -113,7 +113,7 @@ class Acceptor:
         # set the current accepted value
         seqNum = int(seqNum)
         self.currentAcceptedValueMap[seqNum] = message
-        self.currentLeaderMap[seqNum] = id
+        self.currentLeaderMap[seqNum] = int(id)
         # broadcast accepted value to all learner
         resArr = self.learner.receiveAcceptance(self.id, self.port, seqNum, message, self.currentLeaderMap[seqNum], clientID, clientPort, clientSeqNum)
         if resArr is None:
@@ -218,12 +218,12 @@ class Replica:
     def syncSeqNumMap(self, start, end, clientID, clientPort, clientSeqNum, m):
         resArr = []
         for i in range(start, end + 1):
-            if i not in acceptor.seqToInfo:
+            if i not in self.acceptor.seqToInfo:
                 for replica in self.otherReplicas:
                     resArr.append((replica, (':'.join(['9', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(-1), str(i) + ";" + m]).encode('utf-8'))))
         return resArr
 
-    def respMainSeqNum(self, id, port, seqNum, clientID, clientPort, clientSeqNum, m):
+    def respMainSeqNum(self, id, port, clientID, clientPort, clientSeqNum, m):
         msg = ':'.join(['8', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(-1), str(self.mainSeqNum) + ";" + m]).encode('utf-8')
         return [(port, msg)]
 
@@ -298,6 +298,7 @@ class Replica:
             host = addr[0]
             print("Data: ", data)
             reqType, clientID, replicaID, clientPort, replicaPort, clientSeqNum, seqNum, msg = data.split(':')
+            self.mainSeqNum = max(self.mainSeqNum, int(seqNum))
             print("Request type: ", reqType)
             print("Message: ", msg)
             # Don't process request is this client sequence number request has already been taken care of
@@ -350,21 +351,21 @@ class Replica:
                         else:
                             resArray.append(self.runPaxos(msg, str(seqNum), clientID, clientPort, clientSeqNum))
                     # find the holes and sync SeqNumMap
-                    resArray.append(self.syncSeqNumMap(self.learner.currentSeqNum, self.mainSeqNum, clientID, clientPort, clientSeqNum, msg))
+                    resArray = resArray + self.syncSeqNumMap(self.learner.currentSeqNum, self.mainSeqNum, clientID, clientPort, clientSeqNum, msg)
                     # Sync the mainSeqNum of all replicas
-                    resArray.append(self.syncMainSeqNum(clientID, clientPort, clientSeqNum, msg))
+                    resArray = resArray + self.syncMainSeqNum(clientID, clientPort, clientSeqNum, msg)
 
                 elif reqType == "7":
                     # requestSyncMainSeqNum
-                    resArray = self.respMainSeqNum(replicaID, msg, clientID, clientPort, clientSeqNum)
+                    resArray = self.respMainSeqNum(replicaID, replicaPort, clientID, clientPort, clientSeqNum, msg)
 
                 elif reqType == "8":
                     # respSyncMainSeqNum
                     resArray = None
                     mainSeq, m = msg.split(';')
-                    if mainSeq > self.mainSeqNum:
-                        resArray = self.syncSeqNumMap(mainSeqNum + 1, mainSeq, clientID, clientPort, clientSeqNum, m)
-                        mainSeqNum = mainSeq
+                    if int(mainSeq) > self.mainSeqNum:
+                        resArray = self.syncSeqNumMap(self.mainSeqNum + 1, mainSeq, clientID, clientPort, clientSeqNum, m)
+                        self.mainSeqNum = mainSeq
 
                 elif reqType == "9":
                     # requestSyncSeqNumMap
@@ -379,7 +380,7 @@ class Replica:
                             info, m = msg.split(';')
                             cid, cseq = info.split(' ')
                             # if this is the pair we're looking for
-                            if cid == clientID and cseq == clientSeqNum:
+                            if int(cid) == clientID and int(cseq) == clientSeqNum:
                                 self.acceptor.infoToSeq[info] = seqNum
                                 self.acceptor.seqToInfo[seqNum] = seqNum
                                 self.runPaxos(m, str(seqNum), clientID, clientPort, clientSeqNum)
