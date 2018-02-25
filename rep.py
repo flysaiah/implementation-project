@@ -50,9 +50,9 @@ class Proposer:
             requiredMessage = self.requiredMessageMap[seqNum]
         print("Req: ", requiredMessage)
         if requiredMessage is not None and requiredMessage != "None":
-            print("This shouldn't be happening")
+            print("update required message")
             # send required message
-            resArr = self.acceptor.receiveProposedMessage(self.id, self.port, str(seqNum), requiredMessage)
+            resArr = self.acceptor.receiveProposedMessage(self.id, self.port, str(seqNum), requiredMessage, clientID, clientPort, clientSeqNum)
             for replica in self.otherReplicas:
                 resArr.append((replica, (':'.join(['3', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), requiredMessage]).encode('utf-8'))))
             return resArr
@@ -211,7 +211,7 @@ class Replica:
 
     def syncMainSeqNum(self, clientID, clientPort, clientSeqNum, m):
         resArr = []
-        for replica in otherReplicas:
+        for replica in self.otherReplicas:
             resArr.append((replica, (':'.join(['7', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(-1), m]).encode('utf-8'))))
         return resArr;
 
@@ -219,7 +219,7 @@ class Replica:
         resArr = []
         for i in range(start, end + 1):
             if i not in acceptor.seqToInfo:
-                for replica in otherReplicas:
+                for replica in self.otherReplicas:
                     resArr.append((replica, (':'.join(['9', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(-1), str(i) + ";" + m]).encode('utf-8'))))
         return resArr
 
@@ -350,9 +350,9 @@ class Replica:
                         else:
                             resArray.append(self.runPaxos(msg, str(seqNum), clientID, clientPort, clientSeqNum))
                     # find the holes and sync SeqNumMap
-                    resArray.append(self.syncSeqNumMap(self.learner.currentSeqNum, self.mainSeqNum, clientID, clientPort, clientSeqNum, m))
+                    resArray.append(self.syncSeqNumMap(self.learner.currentSeqNum, self.mainSeqNum, clientID, clientPort, clientSeqNum, msg))
                     # Sync the mainSeqNum of all replicas
-                    resArray.append(self.syncMainSeqNum(clientID, clientPort, clientSeqNum, m))
+                    resArray.append(self.syncMainSeqNum(clientID, clientPort, clientSeqNum, msg))
 
                 elif reqType == "7":
                     # requestSyncMainSeqNum
