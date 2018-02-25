@@ -78,7 +78,7 @@ class Acceptor:
         self.port = port
 
     def receiveIAmLeader(self, id, port, seqNum, clientID, clientPort, clientSeqNum):
-        print("Received I AM LEADER for seqNum " + str(seqNum))
+        print("Received I AM LEADER for seqNum " + str(seqNum) + ", clientSeqNum " + str(clientSeqNum))
         # NOTE: Use leader ID, not process ID
         seqNum = int(seqNum)
         if seqNum not in self.currentLeaderMap or self.currentLeaderMap[seqNum] <= int(id):
@@ -292,15 +292,18 @@ class Replica:
                         cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         try:
                             port = int(queueMsg[0])
+                            if port < self.curView + 8000:
+                                print("outdated view: ", port)
+                                continue
                             msg = queueMsg[1]
-                            cs.setblocking(0)
+                            #cs.setblocking(0)
                             cs.connect(('localhost', port))
                             cs.sendall(msg)
                             cs.close()
                         except KeyboardInterrupt:
                             raise
                         except:
-                            print("Error, moving to next message in queue. Message = ", queueMsg)
+                            print("Error = " + str(sys.exc_info()[0]) + ", moving to next message in queue. Message = ", queueMsg)
                             self.queue.put(queueMsg)
                             cs.close()
                             break
@@ -453,7 +456,7 @@ class Replica:
                         print("outdated view: ", port)
                         continue
                     msg = queueMsg[1]
-                    cs.setblocking(0)
+                    #cs.setblocking(0)
                     cs.settimeout(0.5)
                     cs.connect(('localhost', port))
                     cs.sendall(msg)
@@ -481,7 +484,7 @@ class Replica:
                 except KeyboardInterrupt:
                     raise
                 except:
-                    print("Error, moving to next message in queue. Message = ", queueMsg)
+                    print("Error = " + str(sys.exc_info()[0]) + ", moving to next message in queue. Message = ", queueMsg)
                     self.queue.put(queueMsg)
                     cs.close()
                     break
