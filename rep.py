@@ -550,7 +550,6 @@ def main():
     otherReplicas = []
     for i in range(4, argc - 3, 2):
         otherReplicas.append((int(sys.argv[i]), sys.argv[i+1]))
-    print("Other replicas: ", otherReplicas)
     # print(otherReplicas)
     replica = Replica(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], otherReplicas, int(sys.argv[argc-3]), float(sys.argv[argc-2]), sys.argv[argc-1])
     replica.run()
