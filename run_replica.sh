@@ -12,7 +12,7 @@ for ((i=0;i<$num_replica;i++)) {
 		fi
 	}
 	# echo $otherRep
-	python3 rep.py $i `expr $startPort + $i` $otherRep $skipSlot $messageDrop &
+	python3 rep.py $i `expr $startPort + $i` $otherRep $skipSlot $messageDrop True &
 }
 wait
 

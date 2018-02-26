@@ -133,7 +133,7 @@ class Acceptor:
         return resArr
 
 class Learner:
-    def __init__(self, numberOfAcceptors, clientMap, acceptor):
+    def __init__(self, numberOfAcceptors, clientMap, acceptor, batchMode):
         self.numberOfAcceptors = numberOfAcceptors
         self.acceptanceMap = {}
         self.log = ""
@@ -141,6 +141,7 @@ class Learner:
         self.currentSeqNum = 0
         self.clientMap = clientMap
         self.acceptor = acceptor
+        self.batchMode = batchMode
 
     def receiveAcceptance(self, id, port, seqNum, message, leader, clientID, clientPort, clientSeqNum):
         print("Learner received acceptance for seqNum " + str(seqNum))
@@ -190,9 +191,10 @@ class Learner:
                 self.currentSeqNum += 1
             if seqNum > len(self.deliveryArray) / 2 or self.currentSeqNum > len(self.deliveryArray) / 2:
                 self.deliveryArray += [None]*100
-            print("------------LOG------------")
-            print(self.log)
-            print("-----------ENDLOG-----------")
+            if self.batchMode == 'False':
+                print("------------LOG------------")
+                print(self.log)
+                print("-----------ENDLOG-----------")
         return resArr
 
     def printlog(self):
@@ -202,12 +204,12 @@ class Learner:
 
 class Replica:
 
-    def __init__(self, id, port, otherReplicas, skipSlot, messageDrop):
+    def __init__(self, id, port, otherReplicas, skipSlot, messageDrop, batchMode):
         self.id = id
         self.clientMap = {}   # Keeps track of most recent client sequence number for each client
 
         self.acceptor = Acceptor(self.id, port, otherReplicas)
-        self.learner = Learner(len(otherReplicas) + 1, self.clientMap, self.acceptor)
+        self.learner = Learner(len(otherReplicas) + 1, self.clientMap, self.acceptor, batchMode)
         self.proposer = Proposer(self.id, port, len(otherReplicas) + 1, otherReplicas, self.acceptor)
         self.otherReplicas = otherReplicas
         print("Replicas: ", otherReplicas)
@@ -220,6 +222,7 @@ class Replica:
         self.recType6Map = {}
         self.skipSlot = skipSlot   # Integer of seqNum that we will skip
         self.messageDrop = messageDrop   # percentage of messages we will fail to send
+        self.batchMode = batchMode
 
     def runPaxos(self, m, seqNum, clientID, clientPort, clientSeqNum):
         print("Running Paxos")
@@ -531,10 +534,10 @@ def main():
     argc = len(sys.argv)
     print(sys.argv)
     otherReplicas = []
-    for i in range(3, argc - 2):
+    for i in range(3, argc - 3):
         otherReplicas.append(int(sys.argv[i]))
     # print(otherReplicas)
-    replica = Replica(int(sys.argv[1]), int(sys.argv[2]), otherReplicas, int(sys.argv[argc-2]), float(sys.argv[argc-1]))
+    replica = Replica(int(sys.argv[1]), int(sys.argv[2]), otherReplicas, int(sys.argv[argc-3]), float(sys.argv[argc-2]), sys.argv[argc-1])
     replica.run()
 
 main()
