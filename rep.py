@@ -311,6 +311,7 @@ class Replica:
                     print("Timeout, queue is not empty")
                     while not self.queue.empty():
                         queueMsg = self.queue.get()
+                        print("try to send message: ", queueMsg)
                         cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         try:
                             port = int(queueMsg[0])
@@ -361,31 +362,20 @@ class Replica:
                     if (self.mainSeqNum == self.skipSlot):
                         self.mainSeqNum += 1
                     resArray = self.runPaxos(msg, str(self.mainSeqNum), clientID, clientPort, clientSeqNum)
-                    # if resArray is not None:
-                    #     for res in resArray:
-                    #         self.queue.put(res)
+
                 elif reqType == "1":
                     resArray = self.acceptor.receiveIAmLeader(replicaID, replicaPort, str(seqNum), clientID, clientPort, clientSeqNum)
-                    # if resArray is not None:
-                    #     for res in resArray:
-                    #         self.queue.put(res)
+
                 elif reqType == "2":
                     currentAcceptedValue, currentLeader = msg.split(";")
                     resArray = self.proposer.receiveYouAreLeader(replicaID, replicaPort, str(seqNum), currentAcceptedValue, currentLeader, clientID, clientPort, clientSeqNum)
-                    # if resArray is not None:
-                    #     for res in resArray:
-                    #         self.queue.put(res)
+
                 elif reqType == "3":
                     resArray = self.acceptor.receiveProposedMessage(replicaID, replicaPort, str(seqNum), msg, clientID, clientPort, clientSeqNum)
-                    # if resArray is not None:
-                    #     for res in resArray:
-                    #         self.queue.put(res)
+
                 elif reqType == "4":
                     currentAcceptedValue, currentLeader = msg.split(";")
                     resArray = self.learner.receiveAcceptance(replicaID, replicaPort, str(seqNum), currentAcceptedValue, currentLeader, clientID, clientPort, clientSeqNum)
-                    # if resArray is not None:
-                    #     for res in resArray:
-                    #         self.queue.put(res)
 
                 elif reqType == "6":
                     # I'm the new primary, run election
@@ -411,7 +401,6 @@ class Replica:
                     else:
                         # add this request to the map of requests to be processed
                         self.recType6Map[(clientID + " " + clientSeqNum)] = (msg + "|||" + clientPort)
-                        # self.recType6Map.put((clientID, clientSeqNum, msg))
 
                     # find the holes and sync SeqNumMap
                     # resArray = resArray + self.syncSeqNumMap(self.learner.currentSeqNum, self.mainSeqNum, clientID, clientPort, clientSeqNum, msg)
@@ -488,6 +477,7 @@ class Replica:
             # Dequeue and send messages
             while not self.queue.empty():
                 queueMsg = self.queue.get()
+                print("try to send message: ", queueMsg)
                 r = random.random()
                 if r <= self.messageDrop:
                     print("dropping message")

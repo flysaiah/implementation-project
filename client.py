@@ -82,9 +82,9 @@ while 1:
         print("Detecting leader failure, changing view")
         currentLeader += 1
         # TCP_IP = 'localhost'
-        TCP_PORT = TCP_PORT + currentLeader
+        TCP_PORT += 1
         BUFFER_SIZE = 4096
-
+        print("current port: ", TCP_PORT)
         MESSAGE = ":".join(["6", str(myID), "-1",  str(sys.argv[2]), "-1", str(mySeqNum), "-1", "Hello world!" + str(myID) + "--" + str(mySeqNum)])
         c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         c.connect((TCP_IP, int(TCP_PORT)))
