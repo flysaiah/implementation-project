@@ -1,6 +1,7 @@
 #!/bin/bash
 echo "Reading config..." >&2
 source replicas.config
+trap "kill 0" EXIT
 for ((i=0;i<$num_replica;i++)) {
 	otherRep=""
 	for ((j=0;j<$num_replica;j++)) {
@@ -9,9 +10,6 @@ for ((i=0;i<$num_replica;i++)) {
 		fi
 	}
 	# echo $otherRep
-	if(($i == 0))
-		then python3 rep.py $i `expr $startPort + $i` $otherRep $skipSlot $messageDrop &
-	# else
-	# 	& python3 rep.py $i `expr $startPort + $i` $otherRep $skipSlot $messageDrop
-	fi
+	python3 rep.py $i `expr $startPort + $i` $otherRep $skipSlot $messageDrop &
 }
+wait

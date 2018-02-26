@@ -518,11 +518,11 @@ class Replica:
 
 def main():
     argc = len(sys.argv)
-    print(sys.argv)
+    # print(sys.argv)
     otherReplicas = []
     for i in range(3, argc - 2):
         otherReplicas.append(int(sys.argv[i]))
-    print(otherReplicas)
+    # print(otherReplicas)
     replica = Replica(int(sys.argv[1]), int(sys.argv[2]), otherReplicas, int(sys.argv[argc-2]), float(sys.argv[argc-1]))
     replica.run()
 
