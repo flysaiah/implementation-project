@@ -74,6 +74,7 @@ class Acceptor:
         self.seqToInfo = {}
         self.infoToSeq = {}
         self.clientPortMap = {}
+        self.clientHostMap = {}
         self.otherReplicas = otherReplicas
         # self.learner = learner
         self.id = id
@@ -85,6 +86,8 @@ class Acceptor:
         # NOTE: Use leader ID, not process ID
         seqNum = int(seqNum)
         self.clientPortMap[int(clientID)] = int(clientPort)
+        self.clientHostMap[int(clientID)] = clientHostName
+        # print("clientHostName: ", clientHostName)
         if seqNum not in self.currentLeaderMap or self.currentLeaderMap[seqNum] <= int(id):
             currentAcceptedValue = None
             # need to send previous leader to the current leader
@@ -106,6 +109,7 @@ class Acceptor:
         info = str(clientID) + ' ' + clientSeqNum
         seqNum = int(seqNum)
         self.clientPortMap[int(clientID)] = int(clientPort)
+        self.clientHostMap[int(clientID)] = clientHostName
         print("Message: ", message)
         currentLeader = None
         if seqNum in self.currentLeaderMap:
@@ -123,6 +127,7 @@ class Acceptor:
         # set the current accepted value
         seqNum = int(seqNum)
         self.clientPortMap[int(clientID)] = int(clientPort)
+        self.clientHostMap[int(clientID)] = clientHostName
         self.currentAcceptedValueMap[seqNum] = message
         self.currentLeaderMap[seqNum] = int(id)
         # broadcast accepted value to all learner
@@ -185,8 +190,9 @@ class Learner:
                 info = self.acceptor.seqToInfo[self.currentSeqNum]
                 clientID, clientSeqNum = info.split(' ')
                 port = self.acceptor.clientPortMap[int(clientID)]
+                host = self.acceptor.clientHostMap[int(clientID)]
                 msg = ':'.join(['5', str(clientSeqNum), "Delivered"]).encode('utf-8')
-                resArr.append(((port, clientHostName), msg))
+                resArr.append(((port, host), msg))
 
                 self.log += (self.deliveryArray[self.currentSeqNum] + '\n')
                 print("Message delivered: ", self.deliveryArray[self.currentSeqNum])
@@ -310,7 +316,7 @@ class Replica:
             except KeyboardInterrupt:
                 raise
             except Exception as e:
-                print("Exception: ", str(e))
+                # print("Exception: ", str(e))
                 if self.queue.empty():
                     #print("Timeout, queue is empty")
                     continue
