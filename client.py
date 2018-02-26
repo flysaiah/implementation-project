@@ -11,7 +11,7 @@ import sys
 import time
 
 myID = int(sys.argv[1])
-hostname = str(sys.argv[3])
+hostname = str(sys.argv[5])
 currentLeader = 0
 
 TCP_IP = hostname
