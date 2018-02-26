@@ -469,6 +469,7 @@ class Replica:
                 queueMsg = self.queue.get()
                 r = random.random()
                 if r <= self.messageDrop:
+                    print("dropping message")
                     continue
                 cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 try:
@@ -516,7 +517,13 @@ class Replica:
 
 
 def main():
-    replica = Replica(int(sys.argv[1]), int(sys.argv[2]), [int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]), int(sys.argv[6])], 2, .08)
+    argc = len(sys.argv)
+    print(sys.argv)
+    otherReplicas = []
+    for i in range(3, argc - 2):
+        otherReplicas.append(int(sys.argv[i]))
+    print(otherReplicas)
+    replica = Replica(int(sys.argv[1]), int(sys.argv[2]), otherReplicas, int(sys.argv[argc-2]), float(sys.argv[argc-1]))
     replica.run()
 
 main()
