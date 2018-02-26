@@ -66,14 +66,15 @@ class Proposer:
             return resArr
 
 class Acceptor:
-    def __init__(self, id, port, learner, otherReplicas):
+    def __init__(self, id, port, otherReplicas):
         self.currentAcceptedValueMap = {}
         self.currentLeaderMap = {}
         # self.infoToSeq = {}
         self.seqToInfo = {}
         self.infoToSeq = {}
+        self.clientPortMap = {}
         self.otherReplicas = otherReplicas
-        self.learner = learner
+        # self.learner = learner
         self.id = id
         self.port = port
 
@@ -81,6 +82,7 @@ class Acceptor:
         print("Received I AM LEADER for seqNum " + str(seqNum) + ", clientSeqNum " + str(clientSeqNum))
         # NOTE: Use leader ID, not process ID
         seqNum = int(seqNum)
+        self.clientPortMap[int(clientID)] = int(clientPort)
         if seqNum not in self.currentLeaderMap or self.currentLeaderMap[seqNum] <= int(id):
         # if self.currentLeader is None or self.currentLeader == "None" or self.currentLeader <= id:
             info = clientID + ' ' + clientSeqNum
@@ -98,6 +100,7 @@ class Acceptor:
         # NOTE: We were a little unsure about this rule
         info = str(clientID) + ' ' + clientSeqNum
         seqNum = int(seqNum)
+        self.clientPortMap[int(clientID)] = int(clientPort)
         print("Message: ", message)
         currentLeader = None
         if seqNum in self.currentLeaderMap:
@@ -113,10 +116,12 @@ class Acceptor:
         print("Accepting message for seqNum " + str(seqNum))
         # set the current accepted value
         seqNum = int(seqNum)
+        self.clientPortMap[int(clientID)] = int(clientPort)
         self.currentAcceptedValueMap[seqNum] = message
         self.currentLeaderMap[seqNum] = int(id)
         # broadcast accepted value to all learner
-        resArr = self.learner.receiveAcceptance(self.id, self.port, seqNum, message, self.currentLeaderMap[seqNum], clientID, clientPort, clientSeqNum)
+        resArr = []
+        resArr.append((self.port, (':'.join(['4', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), message + ';' + str(id)]).encode('utf-8'))))
         if resArr is None:
             resArr = []
         for replica in self.otherReplicas:
@@ -124,13 +129,14 @@ class Acceptor:
         return resArr
 
 class Learner:
-    def __init__(self, numberOfAcceptors, clientMap):
+    def __init__(self, numberOfAcceptors, clientMap, acceptor):
         self.numberOfAcceptors = numberOfAcceptors
         self.acceptanceMap = {}
         self.log = ""
         self.deliveryArray = [None] * 100
         self.currentSeqNum = 0
         self.clientMap = clientMap
+        self.acceptor = acceptor
 
     def receiveAcceptance(self, id, port, seqNum, message, leader, clientID, clientPort, clientSeqNum):
         print("Learner received acceptance for seqNum " + str(seqNum))
@@ -165,7 +171,16 @@ class Learner:
             print("Message delivered: ", m)
             self.currentSeqNum += 1
             self.clientMap[clientID] = clientSeqNum
+            port = int(clientPort)
+            msg = ':'.join(['5', str(clientSeqNum), "Delivered"]).encode('utf-8')
+            resArr.append((port, msg))
             while self.deliveryArray[self.currentSeqNum] is not None:
+                info = self.acceptor.seqToInfo[self.currentSeqNum]
+                clientID, clientSeqNum = info.split(' ')
+                port = self.acceptor.clientPortMap[int(clientID)]
+                msg = ':'.join(['5', str(clientSeqNum), "Delivered"]).encode('utf-8')
+                resArr.append((port, msg))
+
                 self.log += (self.deliveryArray[self.currentSeqNum] + '\n')
                 print("Message delivered: ", self.deliveryArray[self.currentSeqNum])
                 self.currentSeqNum += 1
@@ -175,18 +190,18 @@ class Learner:
             print(self.log)
             print("-----------ENDLOG-----------")
 
-            port = int(clientPort)
-            msg = ':'.join(['5', str(clientSeqNum), "Delivered"]).encode('utf-8')
+           
 
-            return [(port, msg)]
+        return resArr
 
 class Replica:
 
     def __init__(self, id, port, otherReplicas, skipSlot, messageDrop):
         self.id = id
         self.clientMap = {}   # Keeps track of most recent client sequence number for each client
-        self.learner = Learner(len(otherReplicas) + 1, self.clientMap)
-        self.acceptor = Acceptor(self.id, port, self.learner, otherReplicas)
+
+        self.acceptor = Acceptor(self.id, port, otherReplicas)
+        self.learner = Learner(len(otherReplicas) + 1, self.clientMap, self.acceptor)
         self.proposer = Proposer(self.id, port, len(otherReplicas) + 1, otherReplicas, self.acceptor)
         self.otherReplicas = otherReplicas
         print("Replicas: ", otherReplicas)
