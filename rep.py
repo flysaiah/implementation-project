@@ -355,6 +355,10 @@ class Replica:
             if not data:
                 print("Didn't receive any data")
                 continue
+            r = random.random()
+            if r <= self.messageDrop:
+                print("dropping message: ", data)
+                continue
             host = addr[0]
             print("Data: ", data)
             reqType, clientID, replicaID, clientPort, replicaPort, replicaHostName, clientHostName, clientSeqNum, seqNum, msg = data.split(':')
@@ -494,10 +498,6 @@ class Replica:
             while not self.queue.empty():
                 queueMsg = self.queue.get()
                 print("try to send message: ", queueMsg)
-                r = random.random()
-                if r <= self.messageDrop:
-                    print("dropping message")
-                    continue
                 cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 try:
                     port = int(queueMsg[0][0])
