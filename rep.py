@@ -302,6 +302,7 @@ class Replica:
 
                             msg = queueMsg[1]
                             #cs.setblocking(0)
+                            cs.settimeout(.5)
                             cs.connect(('localhost', port))
                             cs.sendall(msg)
                             cs.close()
@@ -442,7 +443,7 @@ class Replica:
                         for i in range(self.learner.currentSeqNum, self.mainSeqNum + 1):
                             if i not in self.acceptor.seqToInfo:
                                 print("detect hole for seq num ", i)
-                                resArray = resArray + self.runPaxos('___None___', str(i), -1, -1, -1)
+                                resArray += self.runPaxos('___None___', str(i), -1, -1, -1)
                         # clear the map
                         for info in list(self.recType6Map.keys()):
                             self.mainSeqNum += 1
@@ -451,7 +452,7 @@ class Replica:
                             print("main seq before running paxos:", self.mainSeqNum)
                             resArray = resArray + self.runPaxos(msg, str(self.mainSeqNum), clientID, clientPort, clientSeqNum)
                         self.recType6Map = {}
-                        
+
 
 
 
@@ -471,10 +472,10 @@ class Replica:
                     if port == -1:
                         print("hole, sending to -1")
                         continue
-                                
+
                     msg = queueMsg[1]
                     #cs.setblocking(0)
-                    cs.settimeout(0.5)
+                    cs.settimeout(.5)
                     cs.connect(('localhost', port))
                     cs.sendall(msg)
                     cs.close()
