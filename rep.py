@@ -421,10 +421,12 @@ class Replica:
                 elif reqType == "7":
                     # requestPrintLog
                     self.learner.printlog();
-                    resArray = []
-                    for replica in self.otherReplicas:
-                        resArray.append((replica, (':'.join(['7', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(-1), str(-1)]).encode('utf-8'))))
-
+                    if self.curView == self.id:
+                        resArray = []
+                        for replica in self.otherReplicas:
+                            resArray.append((replica, (':'.join(['7', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(-1), str(-1)]).encode('utf-8'))))
+                    else:
+                        resArray = None
                 # elif reqType == "8":
                 #     # respSyncMainSeqNum
                 #     resArray = None
