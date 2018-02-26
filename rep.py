@@ -442,7 +442,7 @@ class Replica:
                         for i in range(self.learner.currentSeqNum, self.mainSeqNum + 1):
                             if i not in self.acceptor.seqToInfo:
                                 print("detect hole for seq num ", i)
-                                resArray + self.runPaxos('___None___', str(i), -1, -1, -1)
+                                resArray = resArray + self.runPaxos('___None___', str(i), -1, -1, -1)
                         # clear the map
                         for info in list(self.recType6Map.keys()):
                             self.mainSeqNum += 1
