@@ -28,6 +28,7 @@ s.close()
 
 TCP_IP = 'localhost'
 MY_PORT = int(sys.argv[2])
+print_log = int(sys.argv[4])
 BUFFER_SIZE = 4096
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -39,20 +40,22 @@ mySeqNum = 0
 
 while 1:
     try:
-        conn, addr = s.accept()
-        #print ('Connection address:', addr)
-        data = conn.recv(BUFFER_SIZE).decode('utf_8')
-        conn.close()
-        #print("Request received, data = ", data)
-        if not data:
-            print("Didn't receive any data")
-            continue
-        host = addr[0]
-        print("Received data: ", data)
-        reqType, seqNum, msg = data.split(':')
+        seqNum = mySeqNum
+        # does not need feedback for print request
+        if mySeqNum == 0 or mySeqNum % print_log != 0:
+            conn, addr = s.accept()
+            #print ('Connection address:', addr)
+            data = conn.recv(BUFFER_SIZE).decode('utf_8')
+            conn.close()
+            #print("Request received, data = ", data)
+            if not data:
+                print("Didn't receive any data")
+                continue
+            host = addr[0]
+            print("Received data: ", data)
+            reqType, seqNum, msg = data.split(':')
 
         if int(mySeqNum) == int(seqNum):
-
             print("Client ID " + str(myID) + " sequence number from " + str(mySeqNum) + " to " + str(mySeqNum + 1))
 
             mySeqNum += 1
@@ -64,11 +67,14 @@ while 1:
             # BUFFER_SIZE = 4096
 
             MESSAGE = ":".join(["0", str(myID), "-1",  str(sys.argv[2]), "-1", str(mySeqNum), "-1", "Hello world!" + str(myID) + "--" + str(mySeqNum)])
+            if mySeqNum != 0 and mySeqNum % print_log == 0:
+                MESSAGE = ":".join(["7", str(myID), "-1",  str(sys.argv[2]), "-1", str(mySeqNum), "-1", ""])
+            
             c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             c.connect((TCP_IP, int(TCP_PORT)))
             c.sendall(MESSAGE.encode('utf-8'))
-            rep = c.recv(BUFFER_SIZE)
             c.close()
+
     except KeyboardInterrupt:
         raise
     except socket.timeout:

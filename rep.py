@@ -193,10 +193,12 @@ class Learner:
             print("------------LOG------------")
             print(self.log)
             print("-----------ENDLOG-----------")
-
-           
-
         return resArr
+
+    def printlog(self):
+        print("------------LOG------------")
+        print(self.log)
+        print("-----------ENDLOG-----------")
 
 class Replica:
 
@@ -289,8 +291,7 @@ class Replica:
         #     4. accceptedValue
         #     5. client message delivered
         #     6. client message resent
-        #     7. requestSyncMainSeqNum
-        #     8, responseSyncMainSeqNum
+        #     7. requestPrintLog
         #     9. requestSyncSeqNumMap
         #     10. responseSyncSeqNumMap
 
@@ -408,22 +409,21 @@ class Replica:
                             print("WOO RUNNING PAXOS")
                             resArray = resArray + self.runPaxos(msg, str(seqNum), clientID, clientPort, clientSeqNum)
                     else:
+                        # add this request to the map of requests to be processed
                         self.recType6Map[(clientID + " " + clientSeqNum)] = (msg + "|||" + clientPort)
                         # self.recType6Map.put((clientID, clientSeqNum, msg))
-
-
 
                     # find the holes and sync SeqNumMap
                     # resArray = resArray + self.syncSeqNumMap(self.learner.currentSeqNum, self.mainSeqNum, clientID, clientPort, clientSeqNum, msg)
                     # # Sync the mainSeqNum of all replicas
                     # resArray = resArray + self.syncMainSeqNum(clientID, clientPort, clientSeqNum, msg)
 
-                # elif reqType == "7":
-                #     # requestSyncMainSeqNum
-                #     if(int(replicaID) > self.curView):
-                #         self.curView = int(replicaID)
-                #         print("changing view: ", self.curView)
-                #     resArray = self.respMainSeqNum(replicaID, replicaPort, clientID, clientPort, clientSeqNum, msg)
+                elif reqType == "7":
+                    # requestPrintLog
+                    self.learner.printlog();
+                    resArray = []
+                    for replica in self.otherReplicas:
+                        resArray.append((replica, (':'.join(['7', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(-1), str(-1)]).encode('utf-8'))))
 
                 # elif reqType == "8":
                 #     # respSyncMainSeqNum

@@ -4,7 +4,7 @@ source batch_mode.config
 trap "kill 0" EXIT
 
 for ((i=0;i<$num_client;i++)) {
-	python3 client.py $i `expr $startClientPort + $i` $startPort &
+	python3 client.py $i `expr $startClientPort + $i` $startPort $printLog &
 }
 
 wait
