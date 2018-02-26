@@ -84,16 +84,19 @@ class Acceptor:
         seqNum = int(seqNum)
         self.clientPortMap[int(clientID)] = int(clientPort)
         if seqNum not in self.currentLeaderMap or self.currentLeaderMap[seqNum] <= int(id):
-        # if self.currentLeader is None or self.currentLeader == "None" or self.currentLeader <= id:
+            currentAcceptedValue = None
+            # need to send previous leader to the current leader
+            prevLeader = None
+            if seqNum in self.currentAcceptedValueMap:
+                currentAcceptedValue = self.currentAcceptedValueMap[seqNum]
+                prevLeader = self.currentLeaderMap[seqNum]
             info = clientID + ' ' + clientSeqNum
             self.currentLeaderMap[seqNum] = int(id)
             self.seqToInfo[seqNum] = info
             self.infoToSeq[info] = seqNum
             print("Port: ", port)
-            currentAcceptedValue = None
-            if seqNum in self.currentAcceptedValueMap:
-                currentAcceptedValue = self.currentAcceptedValueMap[seqNum]
-            return [(port, (':'.join(['2', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), str(currentAcceptedValue) + ';' + str(self.currentLeaderMap[seqNum])]).encode('utf-8')))]
+            
+            return [(port, (':'.join(['2', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), str(currentAcceptedValue) + ';' + str(prevLeader)]).encode('utf-8')))]
 
     def receiveProposedMessage(self, id, port, seqNum, message, clientID, clientPort, clientSeqNum):
         print("Received proposed message for seqNum " + str(seqNum))
@@ -108,6 +111,7 @@ class Acceptor:
         else:
             self.seqToInfo[seqNum] = info
             self.infoToSeq[info] = seqNum
+            self.currentLeaderMap[seqNum] = int(id)
         if currentLeader is None or int(id) >= currentLeader:
             return self.acceptMessage(id, seqNum, message, clientID, clientPort, clientSeqNum)
 
@@ -122,10 +126,10 @@ class Acceptor:
         # broadcast accepted value to all learner
         resArr = []
         resArr.append((self.port, (':'.join(['4', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), message + ';' + str(id)]).encode('utf-8'))))
-        if resArr is None:
-            resArr = []
+        # if resArr is None:
+        #     resArr = []
         for replica in self.otherReplicas:
-            resArr.append((replica, (':'.join(['4', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), str(self.currentAcceptedValueMap[seqNum]) + ';' + str(self.currentLeaderMap[seqNum])]).encode('utf-8'))))
+            resArr.append((replica, (':'.join(['4', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), message + ';' + str(id)]).encode('utf-8'))))
         return resArr
 
 class Learner:

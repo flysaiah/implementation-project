@@ -14,7 +14,8 @@ myID = int(sys.argv[1])
 currentLeader = 0
 
 TCP_IP = 'localhost'
-TCP_PORT = "800" + str(currentLeader)
+# TCP_PORT = "800" + str(currentLeader)
+TCP_PORT = int(sys.argv[3])
 BUFFER_SIZE = 1024
 
 
@@ -26,11 +27,11 @@ rep = s.recv(BUFFER_SIZE)
 s.close()
 
 TCP_IP = 'localhost'
-TCP_PORT = int(sys.argv[2])
+MY_PORT = int(sys.argv[2])
 BUFFER_SIZE = 4096
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.bind((TCP_IP, TCP_PORT))
+s.bind((TCP_IP, MY_PORT))
 s.settimeout(10)
 s.listen(1)
 
@@ -58,9 +59,9 @@ while 1:
 
             myID = sys.argv[1]
 
-            TCP_IP = 'localhost'
-            TCP_PORT = "800" + str(currentLeader)
-            BUFFER_SIZE = 4096
+            # TCP_IP = 'localhost'
+            # TCP_PORT = "800" + str(currentLeader)
+            # BUFFER_SIZE = 4096
 
             MESSAGE = ":".join(["0", str(myID), "-1",  str(sys.argv[2]), "-1", str(mySeqNum), "-1", "Hello world!" + str(myID) + "--" + str(mySeqNum)])
             c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -74,8 +75,8 @@ while 1:
     # except socket.timeout:
         print("Detecting leader failure, changing view")
         currentLeader += 1
-        TCP_IP = 'localhost'
-        TCP_PORT = "800" + str(currentLeader)
+        # TCP_IP = 'localhost'
+        TCP_PORT = TCP_PORT + currentLeader
         BUFFER_SIZE = 4096
 
         MESSAGE = ":".join(["6", str(myID), "-1",  str(sys.argv[2]), "-1", str(mySeqNum), "-1", "Hello world!" + str(myID) + "--" + str(mySeqNum)])
