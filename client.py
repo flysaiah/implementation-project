@@ -14,14 +14,9 @@ myID = int(sys.argv[1])
 hostname = str(sys.argv[3])
 currentLeader = 0
 
-<<<<<<< Updated upstream
-TCP_IP = 'localhost'
+TCP_IP = hostname
 # TCP_PORT = "800" + str(currentLeader)
 TCP_PORT = int(sys.argv[3])
-=======
-TCP_IP = hostname
-TCP_PORT = "800" + str(currentLeader)
->>>>>>> Stashed changes
 BUFFER_SIZE = 1024
 
 mySeqNum = 0
@@ -34,14 +29,9 @@ s.sendall(MESSAGE.encode('utf-8'))
 rep = s.recv(BUFFER_SIZE)
 s.close()
 
-<<<<<<< Updated upstream
-TCP_IP = 'localhost'
+TCP_IP = hostname
 MY_PORT = int(sys.argv[2])
 print_log = int(sys.argv[4])
-=======
-TCP_IP = hostname
-TCP_PORT = int(sys.argv[2])
->>>>>>> Stashed changes
 BUFFER_SIZE = 4096
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -78,14 +68,10 @@ while 1:
             # TCP_PORT = "800" + str(currentLeader)
             # BUFFER_SIZE = 4096
 
-<<<<<<< Updated upstream
-            MESSAGE = ":".join(["0", str(myID), "-1",  str(sys.argv[2]), "-1", str(mySeqNum), "-1", "Hello world!" + str(myID) + "--" + str(mySeqNum)])
-            if mySeqNum != 0 and mySeqNum % print_log == 0:
-                MESSAGE = ":".join(["7", str(myID), "-1",  str(sys.argv[2]), "-1", str(mySeqNum), "-1", ""])
-            
-=======
             MESSAGE = ":".join(["0", str(myID), "-1",  str(sys.argv[2]), "-1", "none", hostname, str(mySeqNum), "-1", "Hello world!" + str(myID) + "--" + str(mySeqNum)])
->>>>>>> Stashed changes
+            if mySeqNum != 0 and mySeqNum % print_log == 0:
+                MESSAGE = ":".join(["7", str(myID), "-1",  str(sys.argv[2]), "-1", "none", hostname, str(mySeqNum), "-1", ""])
+
             c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             c.connect((TCP_IP, int(TCP_PORT)))
             c.sendall(MESSAGE.encode('utf-8'))
@@ -97,19 +83,11 @@ while 1:
     # except socket.timeout:
         print("Detecting leader failure, changing view")
         currentLeader += 1
-<<<<<<< Updated upstream
         # TCP_IP = 'localhost'
         TCP_PORT += 1
         BUFFER_SIZE = 4096
         print("current port: ", TCP_PORT)
-        MESSAGE = ":".join(["6", str(myID), "-1",  str(sys.argv[2]), "-1", str(mySeqNum), "-1", "Hello world!" + str(myID) + "--" + str(mySeqNum)])
-=======
-        TCP_IP = hostname
-        TCP_PORT = "800" + str(currentLeader)
-        BUFFER_SIZE = 4096
-
         MESSAGE = ":".join(["6", str(myID), "-1",  str(sys.argv[2]), "-1", "none", hostname, str(mySeqNum), "-1", "Hello world!" + str(myID) + "--" + str(mySeqNum)])
->>>>>>> Stashed changes
         c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         c.connect((TCP_IP, int(TCP_PORT)))
         c.sendall(MESSAGE.encode('utf-8'))
