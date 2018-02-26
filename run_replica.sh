@@ -8,12 +8,10 @@ for ((i=0;i<$num_replica;i++)) {
 	otherRep=""
 	for ((j=0;j<$num_replica;j++)) {
 		if(($j != $i))
-			then otherRep="$otherRep `expr $startPort + $j`"
+			then otherRep="$otherRep `expr $startPort + $j` localhost"
 		fi
 	}
 	# echo $otherRep
-	python3 rep.py $i `expr $startPort + $i` $otherRep $skipSlot $messageDrop True &
+	python3 rep.py $i `expr $startPort + $i` $hostname $otherRep $skipSlot $messageDrop True &
 }
 wait
-
-

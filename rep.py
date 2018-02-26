@@ -127,7 +127,7 @@ class Acceptor:
         self.currentLeaderMap[seqNum] = int(id)
         # broadcast accepted value to all learner
         resArr = []
-        resArr.append((self.port, (':'.join(['4', str(clientID), str(self.id), str(clientPort), str(self.port), self.hostname, clientHostName, str(clientSeqNum), str(seqNum), message + ';' + str(id)]).encode('utf-8'))))
+        resArr.append(((self.port, self.hostname), (':'.join(['4', str(clientID), str(self.id), str(clientPort), str(self.port), self.hostname, clientHostName, str(clientSeqNum), str(seqNum), message + ';' + str(id)]).encode('utf-8'))))
         # if resArr is None:
         #     resArr = []
         for replica in self.otherReplicas:
@@ -169,7 +169,6 @@ class Learner:
     def deliver_message(self, m, seqNum, clientID, clientPort, clientHostName, clientSeqNum):
         seqNum = int(seqNum)
         self.deliveryArray[seqNum] = m
-        self.printCount += 1
         print("Delivering message")
         print("seqNum: ", seqNum)
         print("currentSeqNum: ", self.currentSeqNum)
@@ -181,13 +180,13 @@ class Learner:
             self.clientMap[clientID] = clientSeqNum
             port = int(clientPort)
             msg = ':'.join(['5', str(clientSeqNum), "Delivered"]).encode('utf-8')
-            resArr.append((port, msg))
+            resArr.append(((port, clientHostName), msg))
             while self.deliveryArray[self.currentSeqNum] is not None:
                 info = self.acceptor.seqToInfo[self.currentSeqNum]
                 clientID, clientSeqNum = info.split(' ')
                 port = self.acceptor.clientPortMap[int(clientID)]
                 msg = ':'.join(['5', str(clientSeqNum), "Delivered"]).encode('utf-8')
-                resArr.append((port, msg))
+                resArr.append(((port, clientHostName), msg))
 
                 self.log += (self.deliveryArray[self.currentSeqNum] + '\n')
                 print("Message delivered: ", self.deliveryArray[self.currentSeqNum])
@@ -543,10 +542,11 @@ def main():
     argc = len(sys.argv)
     print(sys.argv)
     otherReplicas = []
-    for i in range(3, argc - 3, 2):
-        otherReplicas.append((int(sys.argv[i], int(sys.argv[i+1])))
+    for i in range(4, argc - 3, 2):
+        otherReplicas.append((int(sys.argv[i]), sys.argv[i+1]))
+    print("Other replicas: ", otherReplicas)
     # print(otherReplicas)
-    replica = Replica(int(sys.argv[1]), int(sys.argv[2]), otherReplicas, int(sys.argv[argc-3]), float(sys.argv[argc-2]), sys.argv[argc-1])
+    replica = Replica(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], otherReplicas, int(sys.argv[argc-3]), float(sys.argv[argc-2]), sys.argv[argc-1])
     replica.run()
 
 main()
