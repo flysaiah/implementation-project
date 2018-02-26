@@ -13,7 +13,7 @@ from queue import Queue
 #     rpc_paths = ('/RPC2',)
 
 class Proposer:
-    def __init__(self, id, port, numberOfAcceptors, otherReplicas, acceptor):
+    def __init__(self, id, port, hostname, numberOfAcceptors, otherReplicas, acceptor):
         self.numberOfAcceptors = numberOfAcceptors
         self.numberOfAcceptorResponsesMap = {}
         self.mostRecentLeaderMap = {}
@@ -23,11 +23,12 @@ class Proposer:
         self.id = id
         self.port = port
         self.acceptor = acceptor
+        self.hostname = hostname
 
     def setMessage(self, seqNum, m):
         self.messageMap[seqNum] = m
 
-    def receiveYouAreLeader(self, id, port, seqNum, currentAcceptedValue, currentLeader, clientID, clientPort, clientSeqNum):
+    def receiveYouAreLeader(self, id, port, hostname, seqNum, currentAcceptedValue, currentLeader, clientID, clientPort, clientHostName, clientSeqNum):
         print("Received YOU ARE LEADER for seqNum " + str(seqNum))
         seqNum = int(seqNum)
         if seqNum in self.numberOfAcceptorResponsesMap:
@@ -39,9 +40,9 @@ class Proposer:
             self.requiredMessageMap[seqNum] = currentAcceptedValue
 
         if self.numberOfAcceptorResponsesMap[seqNum] == (self.numberOfAcceptors // 2 + 1):
-            return self.proposeMessage(seqNum, clientID, clientPort, clientSeqNum)
+            return self.proposeMessage(seqNum, clientID, clientPort, clientHostName, clientSeqNum)
 
-    def proposeMessage(self, seqNum, clientID, clientPort, clientSeqNum):
+    def proposeMessage(self, seqNum, clientID, clientPort, clientHostName, clientSeqNum):
         print("Proposing message for seqNum " + str(seqNum))
         seqNum = int(seqNum)
         print("Message: ", self.messageMap[seqNum])
@@ -52,21 +53,21 @@ class Proposer:
         if requiredMessage is not None and requiredMessage != "None":
             print("update required message")
             # send required message
-            resArr = self.acceptor.receiveProposedMessage(self.id, self.port, str(seqNum), requiredMessage, clientID, clientPort, clientSeqNum)
+            resArr = self.acceptor.receiveProposedMessage(self.id, self.port, self.hostname, str(seqNum), requiredMessage, clientID, clientPort, clientHostName, clientSeqNum)
             for replica in self.otherReplicas:
-                resArr.append((replica, (':'.join(['3', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), requiredMessage]).encode('utf-8'))))
+                resArr.append((replica, (':'.join(['3', str(clientID), str(self.id), str(clientPort), str(self.port), self.hostname, clientHostName, str(clientSeqNum), str(seqNum), requiredMessage]).encode('utf-8'))))
             return resArr
         else:
             # send original message
-            resArr = self.acceptor.receiveProposedMessage(self.id, self.port, str(seqNum), self.messageMap[seqNum], clientID, clientPort, clientSeqNum)
+            resArr = self.acceptor.receiveProposedMessage(self.id, self.port, self.hostname, str(seqNum), self.messageMap[seqNum], clientID, clientPort, clientHostName, clientSeqNum)
             if resArr is None:
                 resArr = []
             for replica in self.otherReplicas:
-                resArr.append((replica, (':'.join(['3', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), self.messageMap[seqNum]]).encode('utf-8'))))
+                resArr.append((replica, (':'.join(['3', str(clientID), str(self.id), str(clientPort), str(self.port), self.hostname, clientHostName, str(clientSeqNum), str(seqNum), self.messageMap[seqNum]]).encode('utf-8'))))
             return resArr
 
 class Acceptor:
-    def __init__(self, id, port, otherReplicas):
+    def __init__(self, id, port, hostname, otherReplicas):
         self.currentAcceptedValueMap = {}
         self.currentLeaderMap = {}
         # self.infoToSeq = {}
@@ -77,8 +78,9 @@ class Acceptor:
         # self.learner = learner
         self.id = id
         self.port = port
+        self.hostname = hostname
 
-    def receiveIAmLeader(self, id, port, seqNum, clientID, clientPort, clientSeqNum):
+    def receiveIAmLeader(self, id, port, hostname, seqNum, clientID, clientPort, clientHostName, clientSeqNum):
         print("Received I AM LEADER for seqNum " + str(seqNum) + ", clientSeqNum " + str(clientSeqNum))
         # NOTE: Use leader ID, not process ID
         seqNum = int(seqNum)
@@ -95,10 +97,10 @@ class Acceptor:
             self.seqToInfo[seqNum] = info
             self.infoToSeq[info] = seqNum
             print("Port: ", port)
-            
-            return [(port, (':'.join(['2', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), str(currentAcceptedValue) + ';' + str(prevLeader)]).encode('utf-8')))]
 
-    def receiveProposedMessage(self, id, port, seqNum, message, clientID, clientPort, clientSeqNum):
+            return [((port, hostname), (':'.join(['2', str(clientID), str(self.id), str(clientPort), str(self.port), self.hostname, clientHostName, str(clientSeqNum), str(seqNum), str(currentAcceptedValue) + ';' + str(prevLeader)]).encode('utf-8')))]
+
+    def receiveProposedMessage(self, id, port, hostname, seqNum, message, clientID, clientPort, clientHostName, clientSeqNum):
         print("Received proposed message for seqNum " + str(seqNum))
         # NOTE: We were a little unsure about this rule
         info = str(clientID) + ' ' + clientSeqNum
@@ -113,10 +115,10 @@ class Acceptor:
             self.infoToSeq[info] = seqNum
             self.currentLeaderMap[seqNum] = int(id)
         if currentLeader is None or int(id) >= currentLeader:
-            return self.acceptMessage(id, seqNum, message, clientID, clientPort, clientSeqNum)
+            return self.acceptMessage(id, seqNum, message, clientID, clientPort, clientHostName, clientSeqNum)
 
         # NOTE: Do we need to update current leader?
-    def acceptMessage(self, id, seqNum, message, clientID, clientPort, clientSeqNum):
+    def acceptMessage(self, id, seqNum, message, clientID, clientPort, clientHostName, clientSeqNum):
         print("Accepting message for seqNum " + str(seqNum))
         # set the current accepted value
         seqNum = int(seqNum)
@@ -125,11 +127,11 @@ class Acceptor:
         self.currentLeaderMap[seqNum] = int(id)
         # broadcast accepted value to all learner
         resArr = []
-        resArr.append((self.port, (':'.join(['4', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), message + ';' + str(id)]).encode('utf-8'))))
+        resArr.append((self.port, (':'.join(['4', str(clientID), str(self.id), str(clientPort), str(self.port), self.hostname, clientHostName, str(clientSeqNum), str(seqNum), message + ';' + str(id)]).encode('utf-8'))))
         # if resArr is None:
         #     resArr = []
         for replica in self.otherReplicas:
-            resArr.append((replica, (':'.join(['4', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), message + ';' + str(id)]).encode('utf-8'))))
+            resArr.append((replica, (':'.join(['4', str(clientID), str(self.id), str(clientPort), str(self.port), self.hostname, clientHostName, str(clientSeqNum), str(seqNum), message + ';' + str(id)]).encode('utf-8'))))
         return resArr
 
 class Learner:
@@ -143,7 +145,7 @@ class Learner:
         self.acceptor = acceptor
         self.batchMode = batchMode
 
-    def receiveAcceptance(self, id, port, seqNum, message, leader, clientID, clientPort, clientSeqNum):
+    def receiveAcceptance(self, id, port, hostname, seqNum, message, leader, clientID, clientPort, clientHostName, clientSeqNum):
         print("Learner received acceptance for seqNum " + str(seqNum))
         seqNum = int(seqNum)
         leader = int(leader)
@@ -162,11 +164,12 @@ class Learner:
             print("Count: 0")
 
         if self.acceptanceMap[(leader, seqNum, message)] == self.numberOfAcceptors // 2 + 1:
-            return self.deliver_message(message, seqNum, clientID, clientPort, clientSeqNum)
+            return self.deliver_message(message, seqNum, clientID, clientPort, clientHostName, clientSeqNum)
 
-    def deliver_message(self, m, seqNum, clientID, clientPort, clientSeqNum):
+    def deliver_message(self, m, seqNum, clientID, clientPort, clientHostName, clientSeqNum):
         seqNum = int(seqNum)
         self.deliveryArray[seqNum] = m
+        self.printCount += 1
         print("Delivering message")
         print("seqNum: ", seqNum)
         print("currentSeqNum: ", self.currentSeqNum)
@@ -204,16 +207,17 @@ class Learner:
 
 class Replica:
 
-    def __init__(self, id, port, otherReplicas, skipSlot, messageDrop, batchMode):
+    def __init__(self, id, port, hostname, otherReplicas, skipSlot, messageDrop, batchMode):
         self.id = id
         self.clientMap = {}   # Keeps track of most recent client sequence number for each client
-
-        self.acceptor = Acceptor(self.id, port, otherReplicas)
+        self.hostname = hostname
+        self.acceptor = Acceptor(self.id, port, hostname, otherReplicas)
         self.learner = Learner(len(otherReplicas) + 1, self.clientMap, self.acceptor, batchMode)
-        self.proposer = Proposer(self.id, port, len(otherReplicas) + 1, otherReplicas, self.acceptor)
+        self.proposer = Proposer(self.id, port, hostname, len(otherReplicas) + 1, otherReplicas, self.acceptor)
         self.otherReplicas = otherReplicas
         print("Replicas: ", otherReplicas)
         self.port = port
+        self.hostname = hostname
         self.queue = Queue()
         self.mainSeqNum = -1
         self.curView = 0
@@ -224,7 +228,7 @@ class Replica:
         self.messageDrop = messageDrop   # percentage of messages we will fail to send
         self.batchMode = batchMode
 
-    def runPaxos(self, m, seqNum, clientID, clientPort, clientSeqNum):
+    def runPaxos(self, m, seqNum, clientID, clientPort, clientHostName, clientSeqNum):
         print("Running Paxos")
         seqNum = int(seqNum)
         self.proposer.setMessage(seqNum, m)
@@ -232,11 +236,11 @@ class Replica:
         currentAcceptedValue = None
         if seqNum in self.acceptor.currentAcceptedValueMap:
             currentAcceptedValue = self.acceptor.currentAcceptedValueMap[seqNum]
-        resArr = self.proposer.receiveYouAreLeader(self.acceptor.id, self.acceptor.port, str(seqNum), currentAcceptedValue, self.acceptor.currentLeaderMap[seqNum], clientID, clientPort, clientSeqNum)
+        resArr = self.proposer.receiveYouAreLeader(self.acceptor.id, self.acceptor.port, self.acceptor.hostname, str(seqNum), currentAcceptedValue, self.acceptor.currentLeaderMap[seqNum], clientID, clientPort, clientHostName, clientSeqNum)
         if resArr is None:
             resArr = []
         for replica in self.otherReplicas:
-            resArr.append((replica, (':'.join(['1', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), '_']).encode('utf-8'))))
+            resArr.append((replica, (':'.join(['1', str(clientID), str(self.id), str(clientPort), str(self.port), self.hostname, clientHostName, str(clientSeqNum), str(seqNum), '_']).encode('utf-8'))))
             #print("LOOPING")
         return resArr
 
@@ -246,18 +250,18 @@ class Replica:
     #         resArr.append((replica, (':'.join(['7', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(-1), m]).encode('utf-8'))))
     #     return resArr;
 
-    def syncSeqNumMap(self, start, seq, clientID, clientPort, clientSeqNum):
+    def syncSeqNumMap(self, start, seq, clientID, clientPort, clientHostName, clientSeqNum):
         # request to sync seqNumMap
         resArr = []
         for replica in self.otherReplicas:
-            resArr.append((replica, (':'.join(['9', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(-1), str(start)]).encode('utf-8'))))
+            resArr.append((replica, (':'.join(['9', str(clientID), str(self.id), str(clientPort), str(self.port), self.hostname, clientHostName, str(clientSeqNum), str(-1), str(start)]).encode('utf-8'))))
         return resArr
 
     # def respMainSeqNum(self, id, port, clientID, clientPort, clientSeqNum, m):
     #     msg = ':'.join(['8', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(-1), str(self.mainSeqNum) + ";" + m]).encode('utf-8')
     #     return [(port, msg)]
 
-    def respSeqNumMap(self, id, port, seqNum, clientID, clientPort, clientSeqNum):
+    def respSeqNumMap(self, id, port, hostname, seqNum, clientID, clientPort, clientHostName, clientSeqNum):
         # respond corresponding (cid, cseq) of seqNum
         res = {}
         seqNum = int(seqNum)
@@ -271,13 +275,13 @@ class Replica:
         for key in list(res.keys()):
             tmp.append(str(key) + "_" + str(res[key]))
         resString = "|".join(tmp)
-        msg = ':'.join(['10', str(clientID), str(self.id), str(clientPort), str(self.port), str(clientSeqNum), str(seqNum), resString]).encode('utf-8')
-        return [(port, msg)]
+        msg = ':'.join(['10', str(clientID), str(self.id), str(clientPort), str(self.port), self.hostname, clientHostName, str(clientSeqNum), str(seqNum), resString]).encode('utf-8')
+        return [((port, hostname), msg)]
 
 
     def run(self):
 
-        TCP_IP = 'localhost'
+        TCP_IP = self.hostname
         TCP_PORT = self.port
         BUFFER_SIZE = 4096
 
@@ -306,7 +310,8 @@ class Replica:
                 conn.close()
             except KeyboardInterrupt:
                 raise
-            except:
+            except Exception as e:
+                print("Exception: ", str(e))
                 if self.queue.empty():
                     #print("Timeout, queue is empty")
                     continue
@@ -317,7 +322,8 @@ class Replica:
                         print("try to send message: ", queueMsg)
                         cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         try:
-                            port = int(queueMsg[0])
+                            port = int(queueMsg[0][0])
+                            hostname = queueMsg[0][1]
                             if port < self.curView + 8000:
                                 print("outdated view: ", port)
                                 continue
@@ -329,13 +335,13 @@ class Replica:
                             msg = queueMsg[1]
                             #cs.setblocking(0)
                             cs.settimeout(.5)
-                            cs.connect(('localhost', port))
+                            cs.connect((hostname, port))
                             cs.sendall(msg)
                             cs.close()
                         except KeyboardInterrupt:
                             raise
-                        except:
-                            print("Error = " + str(sys.exc_info()[0]) + ", moving to next message in queue. Message = ", queueMsg)
+                        except Exception as e:
+                            print("Error = " + str(e) + ", moving to next message in queue. Message = ", queueMsg)
                             self.queue.put(queueMsg)
                             cs.close()
                             break
@@ -346,7 +352,7 @@ class Replica:
                 continue
             host = addr[0]
             print("Data: ", data)
-            reqType, clientID, replicaID, clientPort, replicaPort, clientSeqNum, seqNum, msg = data.split(':')
+            reqType, clientID, replicaID, clientPort, replicaPort, replicaHostName, clientHostName, clientSeqNum, seqNum, msg = data.split(':')
             seqNum = int(seqNum)
             self.mainSeqNum = max(self.mainSeqNum, seqNum)
             # self.mainSeqNum = max(self.mainSeqNum, seqNum)
@@ -364,21 +370,21 @@ class Replica:
                     self.mainSeqNum += 1
                     if (self.mainSeqNum == self.skipSlot):
                         self.mainSeqNum += 1
-                    resArray = self.runPaxos(msg, str(self.mainSeqNum), clientID, clientPort, clientSeqNum)
+                    resArray = self.runPaxos(msg, str(self.mainSeqNum), clientID, clientPort, clientHostName, clientSeqNum)
 
                 elif reqType == "1":
-                    resArray = self.acceptor.receiveIAmLeader(replicaID, replicaPort, str(seqNum), clientID, clientPort, clientSeqNum)
+                    resArray = self.acceptor.receiveIAmLeader(replicaID, replicaPort, replicaHostName, str(seqNum), clientID, clientPort, clientHostName, clientSeqNum)
 
                 elif reqType == "2":
                     currentAcceptedValue, currentLeader = msg.split(";")
-                    resArray = self.proposer.receiveYouAreLeader(replicaID, replicaPort, str(seqNum), currentAcceptedValue, currentLeader, clientID, clientPort, clientSeqNum)
+                    resArray = self.proposer.receiveYouAreLeader(replicaID, replicaPort, replicaHostName, str(seqNum), currentAcceptedValue, currentLeader, clientID, clientPort, clientHostName, clientSeqNum)
 
                 elif reqType == "3":
-                    resArray = self.acceptor.receiveProposedMessage(replicaID, replicaPort, str(seqNum), msg, clientID, clientPort, clientSeqNum)
+                    resArray = self.acceptor.receiveProposedMessage(replicaID, replicaPort, replicaHostName, str(seqNum), msg, clientID, clientPort, clientHostName, clientSeqNum)
 
                 elif reqType == "4":
                     currentAcceptedValue, currentLeader = msg.split(";")
-                    resArray = self.learner.receiveAcceptance(replicaID, replicaPort, str(seqNum), currentAcceptedValue, currentLeader, clientID, clientPort, clientSeqNum)
+                    resArray = self.learner.receiveAcceptance(replicaID, replicaPort, replicaHostName, str(seqNum), currentAcceptedValue, currentLeader, clientID, clientPort, clientHostName, clientSeqNum)
 
                 elif reqType == "6":
                     # I'm the new primary, run election
@@ -386,7 +392,7 @@ class Replica:
                     self.curView = self.id
                     if self.recType6 == False:
                         self.recType6 = True
-                        resArray = self.syncSeqNumMap(self.learner.currentSeqNum, self.mainSeqNum, clientID, clientPort, clientSeqNum)
+                        resArray = self.syncSeqNumMap(self.learner.currentSeqNum, self.mainSeqNum, clientID, clientPort, clientHostName, clientSeqNum)
 
                     print("changing view: ", self.curView)
                     # if the (client, clientSeqNum) combination has been seen before
@@ -396,14 +402,16 @@ class Replica:
                         print("CURRENTSEQNUM = ", self.learner.currentSeqNum)
                         # this message has been delivered, append response to be sent to client
                         if self.learner.currentSeqNum > seqNum:
-                            resArray.append((clientPort, ':'.join(['5', str(clientSeqNum), "Delivered"]).encode('utf-8')))
+                            resArray.append(((clientPort, clientHostName), ':'.join(['5', str(clientSeqNum), "Delivered"]).encode('utf-8')))
                         # this message has not been delivered, run Paxos
                         else:
                             print("WOO RUNNING PAXOS")
-                            resArray = resArray + self.runPaxos(msg, str(seqNum), clientID, clientPort, clientSeqNum)
+                            resArray = resArray + self.runPaxos(msg, str(seqNum), clientID, clientPort, clientHostName, clientSeqNum)
                     else:
-                        # add this request to the map of requests to be processed
-                        self.recType6Map[(clientID + " " + clientSeqNum)] = (msg + "|||" + clientPort)
+                        self.recType6Map[(clientID + " " + clientSeqNum)] = (msg + "|||" + clientPort + "|||" + clientHostName)
+                        # self.recType6Map.put((clientID, clientSeqNum, msg))
+
+
 
                     # find the holes and sync SeqNumMap
                     # resArray = resArray + self.syncSeqNumMap(self.learner.currentSeqNum, self.mainSeqNum, clientID, clientPort, clientSeqNum, msg)
@@ -433,7 +441,7 @@ class Replica:
                         self.curView = int(replicaID)
                         print("changing view: ", self.curView)
                     seqNum = msg
-                    resArray = self.respSeqNumMap(replicaID, replicaPort, seqNum, clientID, clientPort, clientSeqNum)
+                    resArray = self.respSeqNumMap(replicaID, replicaPort, replicaHostName, seqNum, clientID, clientPort, clientHostName, clientSeqNum)
 
                 elif reqType == "10":
                     resArray = []
@@ -452,22 +460,22 @@ class Replica:
                                 self.mainSeqNum = max(self.mainSeqNum, seqNum)
                                 if info in self.recType6Map:
                                     clientID, clientSeqNum = info.split(" ")
-                                    msg, clientPort = self.recType6Map[info].split("|||")
-                                    resArray = resArray + self.runPaxos(msg, str(seqNum), clientID, clientPort, clientSeqNum)
+                                    msg, clientPort, clientHostName = self.recType6Map[info].split("|||")
+                                    resArray = resArray + self.runPaxos(msg, str(seqNum), clientID, clientPort, clientHostName, clientSeqNum)
                                     del self.recType6Map[info]
                     if(self.syncCount == len(self.otherReplicas) // 2):
                         # detect the holes and propose None for the holes
                         for i in range(self.learner.currentSeqNum, self.mainSeqNum + 1):
                             if i not in self.acceptor.seqToInfo:
                                 print("detect hole for seq num ", i)
-                                resArray += self.runPaxos('___None___', str(i), -1, -1, -1)
+                                resArray += self.runPaxos('___None___', str(i), -1, -1, "nothing", -1)
                         # clear the map
                         for info in list(self.recType6Map.keys()):
                             self.mainSeqNum += 1
                             clientID, clientSeqNum = info.split(" ")
-                            msg, clientPort = self.recType6Map[info].split("|||")
+                            msg, clientPort, clientHostName = self.recType6Map[info].split("|||")
                             print("main seq before running paxos:", self.mainSeqNum)
-                            resArray = resArray + self.runPaxos(msg, str(self.mainSeqNum), clientID, clientPort, clientSeqNum)
+                            resArray = resArray + self.runPaxos(msg, str(self.mainSeqNum), clientID, clientPort, clientHostName, clientSeqNum)
                         self.recType6Map = {}
 
 
@@ -487,7 +495,8 @@ class Replica:
                     continue
                 cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 try:
-                    port = int(queueMsg[0])
+                    port = int(queueMsg[0][0])
+                    hostname = queueMsg[0][1]
                     if port < self.curView + 8000:
                         print("outdated view: ", port)
                         continue
@@ -498,7 +507,7 @@ class Replica:
                     msg = queueMsg[1]
                     #cs.setblocking(0)
                     cs.settimeout(.5)
-                    cs.connect(('localhost', port))
+                    cs.connect((hostname, port))
                     cs.sendall(msg)
                     cs.close()
                 # except socket.timeout:
@@ -523,8 +532,8 @@ class Replica:
                 #     break
                 except KeyboardInterrupt:
                     raise
-                except:
-                    print("Error = " + str(sys.exc_info()[0]) + ", moving to next message in queue. Message = ", queueMsg)
+                except Exception as e:
+                    print("Error = " + str(e) + ", moving to next message in queue. Message = ", queueMsg)
                     self.queue.put(queueMsg)
                     cs.close()
                     break
