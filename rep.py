@@ -96,7 +96,7 @@ class Acceptor:
     def receiveProposedMessage(self, id, port, seqNum, message, clientID, clientPort, clientSeqNum):
         print("Received proposed message for seqNum " + str(seqNum))
         # NOTE: We were a little unsure about this rule
-        info = clientID + ' ' + clientSeqNum
+        info = str(clientID) + ' ' + clientSeqNum
         seqNum = int(seqNum)
         print("Message: ", message)
         currentLeader = None
@@ -171,14 +171,14 @@ class Learner:
                 self.currentSeqNum += 1
             if seqNum > len(self.deliveryArray) / 2 or self.currentSeqNum > len(self.deliveryArray) / 2:
                 self.deliveryArray += [None]*100
-        print("------------LOG------------")
-        print(self.log)
-        print("-----------ENDLOG-----------")
+            print("------------LOG------------")
+            print(self.log)
+            print("-----------ENDLOG-----------")
 
-        port = int(clientPort)
-        msg = ':'.join(['5', str(clientSeqNum), "Delivered"]).encode('utf-8')
+            port = int(clientPort)
+            msg = ':'.join(['5', str(clientSeqNum), "Delivered"]).encode('utf-8')
 
-        return [(port, msg)]
+            return [(port, msg)]
 
 class Replica:
 
@@ -518,7 +518,7 @@ class Replica:
 
 def main():
     argc = len(sys.argv)
-    # print(sys.argv)
+    print(sys.argv)
     otherReplicas = []
     for i in range(3, argc - 2):
         otherReplicas.append(int(sys.argv[i]))
