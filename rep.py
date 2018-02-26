@@ -182,7 +182,7 @@ class Learner:
 
 class Replica:
 
-    def __init__(self, id, port, otherReplicas):
+    def __init__(self, id, port, otherReplicas, skipSlot, messageDrop):
         self.id = id
         self.clientMap = {}   # Keeps track of most recent client sequence number for each client
         self.learner = Learner(len(otherReplicas) + 1, self.clientMap)
@@ -197,6 +197,8 @@ class Replica:
         self.recType6 = False
         self.syncCount = 0
         self.recType6Map = {}
+        self.skipSlot = skipSlot   # Integer of seqNum that we will skip
+        self.messageDrop = messageDrop   # percentage of messages we will fail to send
 
     def runPaxos(self, m, seqNum, clientID, clientPort, clientSeqNum):
         print("Running Paxos")
@@ -236,8 +238,8 @@ class Replica:
         res = {}
         seqNum = int(seqNum)
         for i in range(seqNum, self.mainSeqNum):
-            if i in self.seqToInfo:
-                res[i] = self.seqToInfo[i]
+            if i in self.acceptor.seqToInfo:
+                res[i] = self.acceptor.seqToInfo[i]
 
         # if(seqNum in self.acceptor.seqToInfo):
         #     msg = self.acceptor.seqToInfo[seqNum]
@@ -333,9 +335,11 @@ class Replica:
 
             resArray = None
             if clientID not in self.clientMap or int(clientSeqNum) >= int(self.clientMap[clientID]):
+                # First check if client has already sent this message
                 if reqType == "0" and (clientID not in self.clientMap or int(clientSeqNum) > int(self.clientMap[clientID])):
                     self.mainSeqNum += 1
-                    # First check if client has already sent this message
+                    if (self.mainSeqNum == self.skipSlot):
+                        self.mainSeqNum += 1
                     resArray = self.runPaxos(msg, str(self.mainSeqNum), clientID, clientPort, clientSeqNum)
                     # if resArray is not None:
                     #     for res in resArray:
@@ -426,7 +430,7 @@ class Replica:
                         res = {}
                         tmp = msg.split("|")
                         for pair in tmp:
-                            res[tmp.split("_")[0]] = res[tmp.split("_")[1]]
+                            res[pair.split("_")[0]] = pair.split("_")[1]
                         for seqNum in list(res.keys()):
                             info = res[seqNum]
                             if info not in self.acceptor.infoToSeq:
@@ -463,6 +467,9 @@ class Replica:
             # Dequeue and send messages
             while not self.queue.empty():
                 queueMsg = self.queue.get()
+                r = random.random()
+                if r <= self.messageDrop:
+                    continue
                 cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 try:
                     port = int(queueMsg[0])
@@ -509,7 +516,7 @@ class Replica:
 
 
 def main():
-    replica = Replica(int(sys.argv[1]), int(sys.argv[2]), [int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]), int(sys.argv[6])])
+    replica = Replica(int(sys.argv[1]), int(sys.argv[2]), [int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]), int(sys.argv[6])], 2, .08)
     replica.run()
 
 main()
