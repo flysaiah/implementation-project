@@ -1,98 +1,150 @@
-# from xmlrpc.server import SimpleXMLRPCServer
-# from xmlrpc.server import SimpleXMLRPCRequestHandler
-# import xmlrpc.client
-#
-# s = xmlrpc.client.ServerProxy("http://localhost:8000", allow_none=True)
-# s.receive_request("PLEASE DELIVER ME")
-
-
 import socket
 import sys
 import time
+import copy
 
-myID = int(sys.argv[1])
-hostname = str(sys.argv[5])
-currentLeader = 0
+class Client:
 
-TCP_IP = hostname
-# TCP_PORT = "800" + str(currentLeader)
-TCP_PORT = int(sys.argv[3])
-BUFFER_SIZE = 1024
+    def __init__(self, id, port, hostname, printLog, allReplicas, tryNumber, timeout):
+        self.id = id
+        self.port = port
+        self.hostname = hostname
+        self.printLog = printLog
+        self.allReplicas = allReplicas
+        self.seqNum = 0
+        self.currentLeaderIndex = 0
+        self.tryNumberLimit = tryNumber
+        self.timeout = timeout
 
-mySeqNum = 0
-
-
-MESSAGE = ":".join(["0", str(myID), "-1",  str(sys.argv[2]), "-1", "none", hostname, str(mySeqNum), "-1", "Hello world!" + str(myID) + "--0"])
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((TCP_IP, int(TCP_PORT)))
-s.sendall(MESSAGE.encode('utf-8'))
-rep = s.recv(BUFFER_SIZE)
-s.close()
-
-TCP_IP = hostname
-MY_PORT = int(sys.argv[2])
-print_log = int(sys.argv[4])
-BUFFER_SIZE = 4096
-
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.bind((TCP_IP, MY_PORT))
-s.settimeout(10)
-s.listen(1)
-
-
-while 1:
-    try:
-        seqNum = mySeqNum
-        # does not need feedback for print request
-        if mySeqNum == 0 or mySeqNum % print_log != 0:
-            conn, addr = s.accept()
-            #print ('Connection address:', addr)
-            data = conn.recv(BUFFER_SIZE).decode('utf_8')
-            conn.close()
-            #print("Request received, data = ", data)
-            if not data:
-                print("Didn't receive any data")
+    def run(self):
+        viewChange = False
+        tryNumber = 0
+        while self.currentLeaderIndex <= (len(self.allReplicas) // 2 + 1):
+            try:
+                BUFFER_SIZE = 1024
+                reqType = "0"
+                if viewChange:
+                    reqType = "6"
+                MESSAGE = ":".join([reqType, str(self.id), "-1",  str(self.port), "-1", "none", self.hostname, str(self.seqNum), "-1", "Hello world!" + str(self.id) + "--" + str(self.seqNum)])
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(self.timeout)
+                port = self.allReplicas[self.currentLeaderIndex][0]
+                hostname = self.allReplicas[self.currentLeaderIndex][1]
+                s.connect((hostname, int(port)))
+                s.sendall(MESSAGE.encode('utf-8'))
+                rep = s.recv(BUFFER_SIZE)
+                s.close()
+                break
+            except KeyboardInterrupt:
+                raise
+            except:
+                tryNumber += 1
+                if tryNumber == self.tryNumberLimit:
+                    print("Initiate view change from " + str(self.currentLeaderIndex) + " to " + str(self.currentLeaderIndex + 1))
+                    # Initiate view change
+                    viewChange = True
+                    tryNumber = 0
+                    self.currentLeaderIndex += 1
                 continue
-            host = addr[0]
-            print("Received data: ", data)
-            reqType, seqNum, msg = data.split(':')
+        if self.currentLeaderIndex > len(self.allReplicas) // 2 + 1:
+            print("More than f replicas have failed; I'm quitting now")
+            return
 
-        if int(mySeqNum) == int(seqNum):
-            print("Client ID " + str(myID) + " sequence number from " + str(mySeqNum) + " to " + str(mySeqNum + 1))
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.bind((self.hostname, int(self.port)))
+        print((self.hostname, int(self.port)))
+        s.settimeout(10)
+        s.listen(1)
 
-            mySeqNum += 1
+        while 1:
+            reqType = None
+            otherSeqNum = None
+            msg = None
+            try:
+                otherSeqNum = self.SeqNum
+                # does not need feedback for print request
+                if self.seqNum == 0 or self.seqNum % self.printLog != 0:
+                    conn, addr = s.accept()
+                    #print ('Connection address:', addr)
+                    data = conn.recv(BUFFER_SIZE).decode('utf_8')
+                    conn.close()
+                    #print("Request received, data = ", data)
+                    if not data:
+                        print("Didn't receive any data")
+                        continue
+                    print("Received data: ", data)
+                    reqType, otherSeqNum, msg = data.split(':')
 
-            myID = sys.argv[1]
+                if int(self.seqNum) == int(otherSeqNum):
+                    print("Client ID " + str(self.id) + " sequence number from " + str(self.seqNum) + " to " + str(self.seqNum + 1))
+                    self.seqNum += 1
+            except socket.timeout:
+                # Leader failure
+                print("Initiate view change from " + str(self.currentLeaderIndex) + " to " + str(self.currentLeaderIndex + 1))
+                self.currentLeaderIndex += 1
+                reqType = 6
+            except:
+                continue
 
-            # TCP_IP = 'localhost'
-            # TCP_PORT = "800" + str(currentLeader)
-            # BUFFER_SIZE = 4096
+            if reqType is None:
+                continue
 
-            MESSAGE = ":".join(["0", str(myID), "-1",  str(sys.argv[2]), "-1", "none", hostname, str(mySeqNum), "-1", "Hello world!" + str(myID) + "--" + str(mySeqNum)])
-            if mySeqNum != 0 and mySeqNum % print_log == 0:
-                MESSAGE = ":".join(["7", str(myID), "-1",  str(sys.argv[2]), "-1", "none", hostname, str(mySeqNum), "-1", ""])
 
-            c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            c.connect((TCP_IP, int(TCP_PORT)))
-            c.sendall(MESSAGE.encode('utf-8'))
-            c.close()
+            viewChange = False
+            if reqType == 6:
+                viewChange = True
+            tryNumber = 0
+            while self.currentLeaderIndex <= (len(self.allReplicas) // 2 + 1):
+                try:
+                    reqType = "0"
+                    if viewChange:
+                        reqType = "6"
+                    MESSAGE = ":".join([reqType, str(self.id), "-1",  str(self.port), "-1", "none", self.hostname, str(self.seqNum), "-1", "Hello world!" + str(self.id) + "--" + str(self.seqNum)])
+                    if self.seqNum != 0 and self.seqNum % self.printLog == 0:
+                        MESSAGE = ":".join(["7", str(self.id), "-1",  str(self.port), "-1", "none", self.hostname, str(self.seqNum), "-1", ""])
 
-    except KeyboardInterrupt:
-        raise
-    except socket.timeout:
-    # except socket.timeout:
-        print("Detecting leader failure, changing view")
-        currentLeader += 1
-        # TCP_IP = 'localhost'
-        TCP_PORT += 1
-        BUFFER_SIZE = 4096
-        print("current port: ", TCP_PORT)
-        MESSAGE = ":".join(["6", str(myID), "-1",  str(sys.argv[2]), "-1", "none", hostname, str(mySeqNum), "-1", "Hello world!" + str(myID) + "--" + str(mySeqNum)])
-        c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        c.connect((TCP_IP, int(TCP_PORT)))
-        c.sendall(MESSAGE.encode('utf-8'))
-        rep = c.recv(BUFFER_SIZE)
-        c.close()
-        continue
-    except:
-        continue
+                    port = self.allReplicas[self.currentLeaderIndex][0]
+                    hostname = self.allReplicas[self.currentLeaderIndex][1]
+                    c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    c.settimeout(self.timeout)
+                    port = self.allReplicas[self.currentLeaderIndex][0]
+                    hostname = self.allReplicas[self.currentLeaderIndex][1]
+                    c.connect((hostname, int(port)))
+                    c.sendall(MESSAGE.encode('utf-8'))
+                    c.close()
+                    break
+                except KeyboardInterrupt:
+                    raise
+                except socket.timeout:
+                    tryNumber += 1
+                    if tryNumber == self.tryNumberLimit:
+                        print("Initiate view change from " + str(self.currentLeaderIndex) + " to " + str(self.currentLeaderIndex + 1))
+                        # Initiate view change
+                        viewChange = True
+                        tryNumber = 0
+                        self.currentLeaderIndex += 1
+                    continue
+                except ConnectionRefusedError:
+                    tryNumber += 1
+                    if tryNumber == self.tryNumberLimit:
+                        print("Initiate view change from " + str(self.currentLeaderIndex) + " to " + str(self.currentLeaderIndex + 1))
+                        # Initiate view change
+                        viewChange = True
+                        tryNumber = 0
+                        self.currentLeaderIndex += 1
+                    continue
+                except Exception as e:
+                    print("Exception = ", str(e))
+                    continue
+
+
+def main():
+    argc = len(sys.argv)
+    allReplicas = []
+    for i in range(5, argc, 2):
+        allReplicas.append((int(sys.argv[i]), sys.argv[i+1]))
+    #print(allReplicas)
+    c = Client(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], int(sys.argv[4]), allReplicas, 5, 5)
+    c.run()
+
+main()
