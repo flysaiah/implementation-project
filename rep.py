@@ -130,6 +130,10 @@ class Acceptor:
         self.clientHostMap[int(clientID)] = clientHostName
         self.currentAcceptedValueMap[seqNum] = message
         self.currentLeaderMap[seqNum] = int(id)
+        info = str(clientID) + ' ' + str(clientSeqNum)
+        seqNum = int(seqNum)
+        self.seqToInfo[seqNum] = info
+        self.infoToSeq[info] = seqNum
         # broadcast accepted value to all learner
         resArr = []
         resArr.append(((self.port, self.hostname), (':'.join(['4', str(clientID), str(self.id), str(clientPort), str(self.port), self.hostname, clientHostName, str(clientSeqNum), str(seqNum), message + ';' + str(id)]).encode('utf-8'))))
