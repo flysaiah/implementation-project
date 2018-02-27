@@ -150,7 +150,7 @@ def main():
     for i in range(6, argc, 2):
         allReplicas.append((int(sys.argv[i]), sys.argv[i+1]))
     #print(allReplicas)
-    c = Client(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], int(sys.argv[4]), int(sys.argv[5]), allReplicas, 20, 5)
+    c = Client(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], int(sys.argv[4]), float(sys.argv[5]), allReplicas, 20, 5)
     c.run()
 
 main()

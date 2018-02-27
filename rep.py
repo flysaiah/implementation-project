@@ -144,7 +144,7 @@ class Acceptor:
         return resArr
 
 class Learner:
-    def __init__(self, numberOfAcceptors, clientMap, acceptor, batchMode):
+    def __init__(self, numberOfAcceptors, clientMap, acceptor, batchMode, id):
         self.numberOfAcceptors = numberOfAcceptors
         self.acceptanceMap = {}
         self.log = ""
@@ -153,6 +153,7 @@ class Learner:
         self.clientMap = clientMap
         self.acceptor = acceptor
         self.batchMode = batchMode
+        self.id = id
 
     def receiveAcceptance(self, id, port, hostname, seqNum, message, leader, clientID, clientPort, clientHostName, clientSeqNum):
         # print("Learner received acceptance for seqNum " + str(seqNum))
@@ -203,15 +204,27 @@ class Learner:
             if seqNum > len(self.deliveryArray) / 2 or self.currentSeqNum > len(self.deliveryArray) / 2:
                 self.deliveryArray += [None]*100
             if self.batchMode == 'False':
-                print("------------LOG------------")
-                print(self.log)
-                print("-----------ENDLOG-----------")
+                filename = "replicalog-" + str(self.id) + ".txt"
+                # First erase anything that might be there
+                open(filename,"w+").close()
+                f = open(filename,"w+")
+                f.write(self.log)
+                f.close()
+                # print("------------LOG------------")
+                # print(self.log)
+                # print("-----------ENDLOG-----------")
         return resArr
 
     def printlog(self):
-        print("------------LOG------------")
-        print(self.log)
-        print("-----------ENDLOG-----------")
+        filename = "replicalog-" + str(self.id) + ".txt"
+        # First erase anything that might be there
+        open(filename,"w+").close()
+        f = open(filename,"w+")
+        f.write(self.log)
+        f.close()
+        # print("------------LOG------------")
+        # print(self.log)
+        # print("-----------ENDLOG-----------")
 
 class Replica:
 
@@ -220,7 +233,7 @@ class Replica:
         self.clientMap = {}   # Keeps track of most recent client sequence number for each client
         self.hostname = hostname
         self.acceptor = Acceptor(self.id, port, hostname, otherReplicas)
-        self.learner = Learner(len(otherReplicas) + 1, self.clientMap, self.acceptor, batchMode)
+        self.learner = Learner(len(otherReplicas) + 1, self.clientMap, self.acceptor, batchMode, self.id)
         self.proposer = Proposer(self.id, port, hostname, len(otherReplicas) + 1, otherReplicas, self.acceptor)
         self.otherReplicas = otherReplicas
         # print("Replicas: ", otherReplicas)
