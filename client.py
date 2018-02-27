@@ -61,7 +61,7 @@ class Client:
             otherSeqNum = None
             msg = None
             try:
-                otherSeqNum = self.SeqNum
+                otherSeqNum = self.seqNum
                 # does not need feedback for print request
                 if self.seqNum == 0 or self.seqNum % self.printLog != 0:
                     conn, addr = s.accept()
@@ -83,12 +83,12 @@ class Client:
                 print("Initiate view change from " + str(self.currentLeaderIndex) + " to " + str(self.currentLeaderIndex + 1))
                 self.currentLeaderIndex += 1
                 reqType = 6
-            except:
+            except Exception as e:
+                print("Exception: ", str(e))
                 continue
 
             if reqType is None:
                 continue
-
 
             viewChange = False
             if reqType == 6:
@@ -144,7 +144,7 @@ def main():
     for i in range(5, argc, 2):
         allReplicas.append((int(sys.argv[i]), sys.argv[i+1]))
     #print(allReplicas)
-    c = Client(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], int(sys.argv[4]), allReplicas, 5, 5)
+    c = Client(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], int(sys.argv[4]), allReplicas, 20, 5)
     c.run()
 
 main()

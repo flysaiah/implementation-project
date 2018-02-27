@@ -106,7 +106,7 @@ class Acceptor:
     def receiveProposedMessage(self, id, port, hostname, seqNum, message, clientID, clientPort, clientHostName, clientSeqNum):
         print("Received proposed message for seqNum " + str(seqNum))
         # NOTE: We were a little unsure about this rule
-        info = str(clientID) + ' ' + clientSeqNum
+        info = str(clientID) + ' ' + str(clientSeqNum)
         seqNum = int(seqNum)
         self.clientPortMap[int(clientID)] = int(clientPort)
         self.clientHostMap[int(clientID)] = clientHostName
@@ -182,7 +182,6 @@ class Learner:
             self.log += (m + '\n')
             print("Message delivered: ", m)
             self.currentSeqNum += 1
-            self.clientMap[clientID] = clientSeqNum
             port = int(clientPort)
             msg = ':'.join(['5', str(clientSeqNum), "Delivered"]).encode('utf-8')
             resArr.append(((port, clientHostName), msg))
@@ -376,6 +375,7 @@ class Replica:
             if clientID not in self.clientMap or int(clientSeqNum) >= int(self.clientMap[clientID]):
                 # First check if client has already sent this message
                 if reqType == "0" and (clientID not in self.clientMap or int(clientSeqNum) > int(self.clientMap[clientID])):
+                    self.clientMap[clientID] = clientSeqNum
                     self.mainSeqNum += 1
                     if (self.mainSeqNum == self.skipSlot):
                         self.mainSeqNum += 1
