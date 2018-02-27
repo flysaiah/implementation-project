@@ -147,6 +147,7 @@ class Client:
 def main():
     argc = len(sys.argv)
     allReplicas = []
+    print(sys.argv)
     for i in range(6, argc, 2):
         allReplicas.append((int(sys.argv[i]), sys.argv[i+1]))
     #print(allReplicas)
