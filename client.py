@@ -53,7 +53,7 @@ class Client:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind((self.hostname, int(self.port)))
         print((self.hostname, int(self.port)))
-        s.settimeout(10)
+        s.settimeout(20)
         s.listen(1)
 
         while 1:

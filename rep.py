@@ -372,9 +372,13 @@ class Replica:
                 print("Client sequence number: ", clientSeqNum)
 
             resArray = None
-            if clientID not in self.clientMap or int(clientSeqNum) >= int(self.clientMap[clientID]):
+            if clientID not in self.clientMap or (int(clientSeqNum) >= int(self.clientMap[clientID])):
                 # First check if client has already sent this message
-                if reqType == "0" and (clientID not in self.clientMap or int(clientSeqNum) > int(self.clientMap[clientID])):
+                prev = -1
+                if clientID in self.clientMap:
+                    prev = self.clientMap[clientID]
+                self.clientMap[clientID] = max(int(clientSeqNum), int(prev))
+                if reqType == "0" and (clientID not in self.clientMap or int(clientSeqNum) > int(prev)):
                     self.clientMap[clientID] = clientSeqNum
                     self.mainSeqNum += 1
                     if (self.mainSeqNum == self.skipSlot):
