@@ -350,7 +350,7 @@ class Replica:
                         hostname = queueMsg[0][1]
                         try:
                             if (port, hostname) in self.deadReplicas:
-                                print("Dead replica: ", (port, hostname))
+                                # print("Dead replica: ", (port, hostname))
                                 continue
                             if port == -1:
                                 # print("hole, sending to -1")
@@ -369,7 +369,7 @@ class Replica:
                             cs.close()
                             self.replicaAttempts[(port, hostname)] += 1
                             if self.replicaAttempts[(port, hostname)] == 10:
-                                print("Adding to dead replicas: ", (port, hostname))
+                                # print("Adding to dead replicas: ", (port, hostname))
                                 self.deadReplicas.add((port, hostname))
                             break
                         except Exception as e:
@@ -535,13 +535,13 @@ class Replica:
             # Dequeue and send messages
             while not self.queue.empty():
                 queueMsg = self.queue.get()
-                print("try to send message: ", queueMsg)
+                # print("try to send message: ", queueMsg)
                 cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 port = int(queueMsg[0][0])
                 hostname = str(queueMsg[0][1])
                 try:
                     if (port, hostname) in self.deadReplicas:
-                        print("Dead replica: ", (port, hostname))
+                        # print("Dead replica: ", (port, hostname))
                         continue
                     if port == -1:
                         # print("hole, sending to -1")
@@ -559,11 +559,11 @@ class Replica:
                     cs.close()
                     self.replicaAttempts[(port, hostname)] += 1
                     if self.replicaAttempts[(port, hostname)] == 10:
-                        print("Adding to dead replicas: ", (port, hostname))
+                        # print("Adding to dead replicas: ", (port, hostname))
                         self.deadReplicas.add((port, hostname))
                     break
                 except Exception as e:
-                    print("Error = " + str(e) + ", moving to next message in queue. Message = ", queueMsg)
+                    # print("Error = " + str(e) + ", moving to next message in queue. Message = ", queueMsg)
                     self.queue.put(queueMsg)
                     cs.close()
                     break

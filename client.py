@@ -2,10 +2,11 @@ import socket
 import sys
 import time
 import copy
+import random
 
 class Client:
 
-    def __init__(self, id, port, hostname, printLog, allReplicas, tryNumber, timeout):
+    def __init__(self, id, port, hostname, printLog, messageDrop, allReplicas, tryNumber, timeout):
         self.id = id
         self.port = port
         self.hostname = hostname
@@ -15,6 +16,7 @@ class Client:
         self.currentLeaderIndex = 0
         self.tryNumberLimit = tryNumber
         self.timeout = timeout
+        self.messageDrop = messageDrop
 
     def run(self):
         viewChange = False
@@ -70,7 +72,11 @@ class Client:
                     conn.close()
                     #print("Request received, data = ", data)
                     if not data:
-                        print("Didn't receive any data")
+                        # print("Didn't receive any data")
+                        continue
+                    r = random.random()
+                    if r <= self.messageDrop:
+                        print("dropping message: ", data)
                         continue
                     print("Received data: ", data)
                     reqType, otherSeqNum, msg = data.split(':')
@@ -141,10 +147,10 @@ class Client:
 def main():
     argc = len(sys.argv)
     allReplicas = []
-    for i in range(5, argc, 2):
+    for i in range(6, argc, 2):
         allReplicas.append((int(sys.argv[i]), sys.argv[i+1]))
     #print(allReplicas)
-    c = Client(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], int(sys.argv[4]), allReplicas, 20, 5)
+    c = Client(int(sys.argv[1]), int(sys.argv[2]), sys.argv[3], int(sys.argv[4]), int(sys.argv[5]), allReplicas, 20, 5)
     c.run()
 
 main()
