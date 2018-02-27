@@ -236,6 +236,23 @@ class Replica:
         self.messageDrop = messageDrop   # percentage of messages we will fail to send
         self.batchMode = batchMode
 
+        self.deadReplicas = set()
+        self.replicaAttempts = {}
+
+        self.initializeIDs()
+        self.initializeReplicaAttempts()
+
+    def initializeIDs(self):
+        # Generate explicit list of IDs for sake of convenience
+        self.otherReplicaIDs = []
+        for i in range(len(self.otherReplicas) + 1):
+            if i != int(self.id):
+                self.otherReplicaIDs.append(i)
+
+    def initializeReplicaAttempts(self):
+        for replica in self.otherReplicas:
+            self.replicaAttempts[replica] = 0
+
     def runPaxos(self, m, seqNum, clientID, clientPort, clientHostName, clientSeqNum):
         # print("Running Paxos")
         seqNum = int(seqNum)
@@ -329,25 +346,32 @@ class Replica:
                         queueMsg = self.queue.get()
                         # print("try to send message: ", queueMsg)
                         cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        port = int(queueMsg[0][0])
+                        hostname = queueMsg[0][1]
                         try:
-                            port = int(queueMsg[0][0])
-                            hostname = queueMsg[0][1]
-                            if port < self.curView + 8000:
-                                # print("outdated view: ", port)
+                            if (port, hostname) in self.deadReplicas:
+                                print("Dead replica: ", (port, hostname))
                                 continue
-
                             if port == -1:
                                 # print("hole, sending to -1")
                                 continue
-
                             msg = queueMsg[1]
                             #cs.setblocking(0)
                             cs.settimeout(.5)
                             cs.connect((hostname, port))
                             cs.sendall(msg)
                             cs.close()
+                            self.replicaAttempts[(port, hostname)] = 0
                         except KeyboardInterrupt:
                             raise
+                        except ConnectionRefusedError:
+                            self.queue.put(queueMsg)
+                            cs.close()
+                            self.replicaAttempts[(port, hostname)] += 1
+                            if self.replicaAttempts[(port, hostname)] == 10:
+                                print("Adding to dead replicas: ", (port, hostname))
+                                self.deadReplicas.add((port, hostname))
+                            break
                         except Exception as e:
                             # print("Error = " + str(e) + ", moving to next message in queue. Message = ", queueMsg)
                             self.queue.put(queueMsg)
@@ -407,6 +431,10 @@ class Replica:
                     # I'm the new primary, run election
                     resArray = []
                     self.curView = self.id
+                    i = 0
+                    while i < self.curView:
+                        self.deadReplicas.add(self.otherReplicas[i])
+                        i += 1
                     if self.recType6 == False:
                         self.recType6 = True
                         resArray = self.syncSeqNumMap(self.learner.currentSeqNum, self.mainSeqNum, clientID, clientPort, clientHostName, clientSeqNum)
@@ -456,6 +484,10 @@ class Replica:
                     # requestSyncSeqNumMap
                     if(int(replicaID) > self.curView):
                         self.curView = int(replicaID)
+                        i = 0
+                        while i < self.curView:
+                            self.deadReplicas.add(self.otherReplicas[i])
+                            i += 1
                         # print("changing view: ", self.curView)
                     seqNum = msg
                     resArray = self.respSeqNumMap(replicaID, replicaPort, replicaHostName, seqNum, clientID, clientPort, clientHostName, clientSeqNum)
@@ -496,8 +528,6 @@ class Replica:
                         self.recType6Map = {}
 
 
-
-
             if resArray is not None:
                 for res in resArray:
                     self.queue.put(res)
@@ -505,48 +535,35 @@ class Replica:
             # Dequeue and send messages
             while not self.queue.empty():
                 queueMsg = self.queue.get()
-                # print("try to send message: ", queueMsg)
+                print("try to send message: ", queueMsg)
                 cs = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                port = int(queueMsg[0][0])
+                hostname = str(queueMsg[0][1])
                 try:
-                    port = int(queueMsg[0][0])
-                    hostname = queueMsg[0][1]
-                    if port < self.curView + 8000:
-                        # print("outdated view: ", port)
+                    if (port, hostname) in self.deadReplicas:
+                        print("Dead replica: ", (port, hostname))
                         continue
                     if port == -1:
                         # print("hole, sending to -1")
                         continue
-
                     msg = queueMsg[1]
                     #cs.setblocking(0)
                     cs.settimeout(.5)
                     cs.connect((hostname, port))
                     cs.sendall(msg)
                     cs.close()
-                # except socket.timeout:
-                #     print("Socket timed out, moving to next message in queue. Message = ", queueMsg)
-                #     self.queue.put(queueMsg)
-                #     break
-                # except ConnectionResetError:
-                #     print("Connection Reset Error, moving to next message in queue. Message = ", queueMsg)
-                #     self.queue.put(queueMsg)
-                #     break
-                # except BrokenPipeError:
-                #     print("Broken pipe error, moving to next message in queue. Message = ", queueMsg)
-                #     self.queue.put(queueMsg)
-                #     break
-                # except OSError:
-                #     print("OS error, moving to next message in queue. Message = ", queueMsg)
-                #     self.queue.put(queueMsg)
-                #     break
-                # except TimeoutError:
-                #     print("Timeout error, moving to next message in queue. Message = ", queueMsg)
-                #     self.queue.put(queueMsg)
-                #     break
                 except KeyboardInterrupt:
                     raise
+                except ConnectionRefusedError:
+                    self.queue.put(queueMsg)
+                    cs.close()
+                    self.replicaAttempts[(port, hostname)] += 1
+                    if self.replicaAttempts[(port, hostname)] == 10:
+                        print("Adding to dead replicas: ", (port, hostname))
+                        self.deadReplicas.add((port, hostname))
+                    break
                 except Exception as e:
-                    # print("Error = " + str(e) + ", moving to next message in queue. Message = ", queueMsg)
+                    print("Error = " + str(e) + ", moving to next message in queue. Message = ", queueMsg)
                     self.queue.put(queueMsg)
                     cs.close()
                     break
